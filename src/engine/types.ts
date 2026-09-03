@@ -36,6 +36,15 @@ export type ParamValues = Readonly<Record<string, number | string>>
  */
 export type RenderContext = {
   seed: string
+  /**
+   * A namespace for this composition's own ids.
+   *
+   * Inline SVGs share one id space with the rest of the HTML document, and the
+   * filmstrip puts several compositions on the page at once. A renderer that
+   * declares a gradient must prefix it with this or the first composition on
+   * the page silently wins for all of them.
+   */
+  uid: string
   /** the per-sample stream, fork('field'). Draw counts here may vary with quality. */
   rng: Rng
   /** derive a stream whose draw count must NOT vary with quality (skeleton decisions) */

@@ -161,6 +161,7 @@ export function compose(input: ComposeInput): ComposeResult {
 
   const ctx: RenderContext = {
     seed,
+    uid: `c${(hashString(`${seed}:${renderer.id}`) >>> 0).toString(36)}`,
     rng: root.fork('field'),
     fork: (salt) => root.fork(salt),
     w, h, aspect, short,
@@ -252,7 +253,7 @@ function assemble(
 ): string {
   const { w, h, short, palette: p, focals } = ctx
   const character = characterOf(renderer.family)
-  const uid = `c${(hashString(`${ctx.seed}:${renderer.id}`) >>> 0).toString(36)}`
+  const uid = ctx.uid
   const formPath = focals.map((foc) => foc.path).join('')
 
   // --- stage 0: defs -------------------------------------------------------

@@ -16,13 +16,13 @@ import { warpedGrid } from './renderers/technical/warped-grid'
 import { eclipseRings } from './renderers/cosmic/eclipse-rings'
 import { starfield } from './renderers/cosmic/starfield'
 import { orbitalPaths } from './renderers/cosmic/orbital-paths'
-import { plainWeave } from './renderers/textile/plain-weave'
-import { plaid } from './renderers/textile/plaid'
 import { stitchGrid } from './renderers/textile/stitch-grid'
+import { drapedSilk } from './renderers/textile/draped-silk'
+import { embroideredBloom } from './renderers/textile/embroidered-bloom'
 import { isometricBlocks } from './renderers/architectural/isometric-blocks'
-import { brutalistStacks } from './renderers/architectural/brutalist-stacks'
-import { stairwells } from './renderers/architectural/stairwells'
-import { marbledInk } from './renderers/liquid/marbled-ink'
+import { colonnade } from './renderers/architectural/colonnade'
+import { ribbedVault } from './renderers/architectural/ribbed-vault'
+import { mercury } from './renderers/liquid/mercury'
 import { oilSlick } from './renderers/liquid/oil-slick'
 import { rippleRings } from './renderers/liquid/ripple-rings'
 import { circlePacking } from './renderers/cellular/circle-packing'
@@ -40,9 +40,9 @@ export const FAMILIES: readonly Family[] = [
   { id: 'atmospheric', name: 'Atmospheric', renderers: [auroraMesh, particleField] },
   { id: 'technical', name: 'Technical', renderers: [circuitTraces, warpedGrid] },
   { id: 'cosmic', name: 'Cosmic', renderers: [eclipseRings, starfield, orbitalPaths] },
-  { id: 'textile', name: 'Textile', renderers: [plainWeave, plaid, stitchGrid] },
-  { id: 'architectural', name: 'Architectural', renderers: [isometricBlocks, brutalistStacks, stairwells] },
-  { id: 'liquid', name: 'Liquid', renderers: [marbledInk, oilSlick, rippleRings] },
+  { id: 'textile', name: 'Textile', renderers: [drapedSilk, embroideredBloom, stitchGrid] },
+  { id: 'architectural', name: 'Architectural', renderers: [colonnade, ribbedVault, isometricBlocks] },
+  { id: 'liquid', name: 'Liquid', renderers: [mercury, oilSlick, rippleRings] },
   { id: 'cellular', name: 'Cellular', renderers: [circlePacking, voronoiCells, coralGrowth] },
 ]
 

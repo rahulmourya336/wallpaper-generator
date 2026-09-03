@@ -5,8 +5,8 @@ import type { FamilyId } from './types'
  * What a category feels like.
  *
  * Palettes and composition archetypes used to be global, so a starfield and a
- * plaid were drawn from the same pool of greys in the same arrangement and
- * the ten families read as one. A character gives each family its own colour
+ * a woven cloth were drawn from the same pool of greys in the same arrangement
+ * and the ten families read as one. A character gives each family its own colour
  * pool, its own taste in layouts, and its own handling of the shared finishing
  * passes, which is where the difference between categories actually lives.
  */
