@@ -1,12 +1,15 @@
 import { memo, useEffect, useMemo, useRef, useState } from 'react'
 import { rendererOr } from '../engine/registry'
 import {
-  PREVIEW_RATIOS, groupForRatio, groupedPresets, makeCustomId, resolveSize, safeZones,
+  PREVIEW_RATIOS, PRESETS, groupForRatio, makeCustomId, resolveSize, safeZones,
 } from '../export/presets'
 import { FORMATS, checkSize, downloadBlob, filenameFor, runExport } from '../export/rasterize'
 import type { ExportFormat, ExportPhase } from '../export/rasterize'
 import { AUTO_PALETTE, actions, useStudio } from '../state/useStudio'
 import { CompositionView } from './CompositionView'
+import { DeviceIcon } from './icons'
+import { Select } from './Select'
+import type { Option } from './Select'
 import { paramsKey, renderComposition, useDebouncedValue } from './useComposition'
 
 /**
@@ -145,6 +148,17 @@ export function ExportDialog({
       ? `Each edge must be between ${MIN_EDGE} and ${MAX_EDGE.toLocaleString()}px. Showing the last valid size.`
       : null
 
+  const sizeOptions: Option[] = [
+    ...PRESETS.map((p) => ({
+      value: p.id,
+      label: p.label,
+      group: p.group,
+      icon: <DeviceIcon group={p.group} />,
+      hint: `${p.width}×${p.height}`,
+    })),
+    { value: 'custom', label: 'Custom size', group: 'Custom', icon: <DeviceIcon group="Desktop" /> },
+  ]
+
   const commitCustom = (width: number, height: number) => {
     setCustom({ width, height })
     if (customValid(width) && customValid(height)) {
@@ -205,6 +219,7 @@ export function ExportDialog({
       </div>
 
       <div className="export__body">
+        <div className="export__preview">
         <div className="export__crops" role="group" aria-label="Preview at each device ratio">
           {PREVIEW_RATIOS.map((r) => (
             <RatioPreview
@@ -230,40 +245,26 @@ export function ExportDialog({
           />
           <span>Show lock screen safe zones</span>
         </label>
+        </div>
 
         <div className="export__fields">
-          <div className="control">
-            <label className="control__head" htmlFor="export-size">
-              <span>Size</span>
-            </label>
-            <select
-              id="export-size"
-              value={size.custom ? 'custom' : size.id}
-              onChange={(e) => {
-                const v = e.currentTarget.value
-                if (v === 'custom') commitCustom(custom.width, custom.height)
-                else actions.setExportPreset(v)
-              }}
-            >
-              {groupedPresets().map(([group, items]) => (
-                <optgroup key={group} label={group}>
-                  {items.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.label} · {p.width}×{p.height}
-                    </option>
-                  ))}
-                </optgroup>
-              ))}
-              <option value="custom">Custom…</option>
-            </select>
-          </div>
+          <Select
+            id="export-size"
+            label="Size"
+            value={size.custom ? 'custom' : size.id}
+            options={sizeOptions}
+            onChange={(v) => {
+              if (v === 'custom') commitCustom(custom.width, custom.height)
+              else actions.setExportPreset(v)
+            }}
+          />
 
           {size.custom ? (
             <div className="export__custom-group">
               <div className="export__custom">
-                <div className="control">
-                  <label className="control__head" htmlFor="export-w">
-                    <span>Width</span>
+                <div className="field">
+                  <label className="field__head" htmlFor="export-w">
+                    <span className="field__label">Width</span>
                   </label>
                   <input
                     id="export-w"
@@ -274,9 +275,9 @@ export function ExportDialog({
                     onChange={(e) => commitCustom(Number(e.currentTarget.value) || 0, custom.height)}
                   />
                 </div>
-                <div className="control">
-                  <label className="control__head" htmlFor="export-h">
-                    <span>Height</span>
+                <div className="field">
+                  <label className="field__head" htmlFor="export-h">
+                    <span className="field__label">Height</span>
                   </label>
                   <input
                     id="export-h"
@@ -292,9 +293,9 @@ export function ExportDialog({
             </div>
           ) : null}
 
-          <div className="control">
-            <span className="control__head">
-              <span id="export-format-label">Format</span>
+          <div className="field">
+            <span className="field__head">
+              <span className="field__label" id="export-format-label">Format</span>
             </span>
             {/* real radios, so arrow keys and screen readers work without help */}
             <div className="chips" role="radiogroup" aria-labelledby="export-format-label">
@@ -314,10 +315,10 @@ export function ExportDialog({
             </div>
           </div>
 
-          <div className="control">
-            <label className="control__head" htmlFor="export-scale">
-              <span>Scale</span>
-              <output htmlFor="export-scale">{effectiveScale.toFixed(1)}×</output>
+          <div className="field">
+            <label className="field__head" htmlFor="export-scale">
+              <span className="field__label">Scale</span>
+              <output className="field__meta" htmlFor="export-scale">{effectiveScale.toFixed(1)}×</output>
             </label>
             <input
               id="export-scale"

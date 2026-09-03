@@ -28,89 +28,89 @@ const DEFAULT: Character = {
   layouts: { centre: 3, low: 2, thirds: 2, macro: 1 },
   vignette: 1,
   grain: 1,
-  formFill: 0.55,
+  formFill: 0.72,
 }
 
 export const CHARACTERS: Record<FamilyId, Character> = {
   // cool, built, structural. likes to sit square and get close.
   geometric: {
-    palettes: ['basalt', 'slate', 'graphite', 'obsidian', 'ember', 'bone', 'chalk', 'denim'],
+    palettes: ['midnight','obsidian','cobalt','ember','mist','paper','ocean'],
     layouts: { centre: 3, low: 3, macro: 3, edge: 2, thirds: 3, diagonal: 2 },
     vignette: 1,
     grain: 1,
-    formFill: 0.55,
+    formFill: 0.72,
   },
   // earthy and grown. wants a horizon and room above it.
   organic: {
-    palettes: ['verdigris', 'moss', 'tobacco', 'rust', 'olive', 'dune', 'clay', 'bone'],
+    palettes: ['verdigris','moss','rust','sage','clay','sand','citron'],
     layouts: { horizon: 3, low: 3, thirds: 3, centre: 2, macro: 2 },
     vignette: 0.85,
     grain: 1.15,
-    formFill: 0.45,
+    formFill: 0.62,
   },
   // loud, flat, printed. bright grounds and pairs of things.
   'retro-pop': {
-    palettes: ['sherbet', 'blush', 'citron', 'terracotta', 'dune', 'maroon', 'plum', 'ember'],
+    palettes: ['sherbet','rose','citron','sunset','wine','plum','clay'],
     layouts: { centre: 2, twin: 3, macro: 3, thirds: 3, edge: 2, diagonal: 2 },
     vignette: 0.5,
     grain: 1.3,
-    formFill: 0.7,
+    formFill: 0.82,
   },
   // deep and open. almost all sky.
   atmospheric: {
-    palettes: ['nocturne', 'indigo', 'abyss', 'orchid', 'slate', 'plum'],
+    palettes: ['midnight','indigo','abyss','plum','teal','cobalt'],
     layouts: { low: 3, horizon: 3, centre: 2, macro: 2, edge: 2 },
     vignette: 1.0,
     grain: 0.85,
-    formFill: 0.4,
+    formFill: 0.58,
   },
   // near monochrome with one signal colour. drawn on a slant.
   technical: {
-    palettes: ['graphite', 'slate', 'nocturne', 'verdigris', 'chalk', 'denim'],
+    palettes: ['obsidian','cobalt','teal','midnight','mist','ocean'],
     layouts: { macro: 3, centre: 2, diagonal: 3, thirds: 3, edge: 2 },
     vignette: 0.9,
     grain: 0.8,
-    formFill: 0.4,
+    formFill: 0.58,
   },
   // the darkest family, and the only one that goes truly black-and-bright.
   cosmic: {
-    palettes: ['nocturne', 'abyss', 'indigo', 'obsidian', 'plum', 'basalt'],
+    palettes: ['indigo','midnight','plum','abyss','wine','obsidian'],
     layouts: { low: 3, centre: 2, macro: 3, edge: 2, twin: 2, horizon: 2 },
     vignette: 1.05,
     grain: 0.9,
-    formFill: 0.42,
+    formFill: 0.6,
   },
   // woven and even. no dramatic light, fills the frame edge to edge.
   textile: {
-    palettes: ['clay', 'terracotta', 'olive', 'denim', 'dune', 'maroon', 'tobacco', 'bone'],
+    palettes: ['clay','sunset','sage','ocean','sand','wine','rust'],
     layouts: { centre: 2, macro: 3, diagonal: 3, twin: 2, thirds: 2 },
     vignette: 0.4,
     grain: 1.25,
-    formFill: 0.65,
+    formFill: 0.78,
   },
   // concrete and daylight. low horizons, subjects pushed to an edge.
   architectural: {
-    palettes: ['graphite', 'slate', 'obsidian', 'clay', 'chalk', 'bone', 'rust'],
+    palettes: ['obsidian','midnight','clay','mist','paper','rust','sage'],
     layouts: { low: 3, thirds: 3, edge: 3, horizon: 2, centre: 2, macro: 2 },
     vignette: 0.95,
     grain: 1.05,
-    formFill: 0.5,
+    formFill: 0.68,
   },
   // iridescent and wet. close in, or two pools at once.
   liquid: {
-    palettes: ['orchid', 'abyss', 'indigo', 'plum', 'nocturne', 'terracotta', 'blush'],
+    palettes: ['plum','abyss','teal','indigo','cobalt','sunset','rose'],
     layouts: { macro: 3, centre: 2, twin: 3, diagonal: 3, low: 2 },
     vignette: 0.95,
     grain: 0.9,
-    formFill: 0.45,
+    formFill: 0.62,
   },
   // grown structures, packed. close, and often more than one colony.
   cellular: {
-    palettes: ['verdigris', 'moss', 'maroon', 'rust', 'olive', 'abyss', 'bone', 'clay'],
+    palettes: ['verdigris','moss','wine','rust','sage','abyss','sand'],
     layouts: { macro: 3, centre: 2, twin: 3, thirds: 3, low: 2 },
     vignette: 0.9,
     grain: 1.1,
-    formFill: 0.5,
+    formFill: 0.68,
   },
 }
 

@@ -1,18 +1,21 @@
 import { resolveParams } from '../engine/compositor'
 import { PALETTES } from '../engine/palette'
-import { FAMILIES, getFamily, rendererOr } from '../engine/registry'
 import { characterOf } from '../engine/character'
-import { groupedPresets, resolveSize } from '../export/presets'
+import { FAMILIES, getFamily, rendererOr } from '../engine/registry'
+import { PRESETS, resolveSize } from '../export/presets'
 import { AUTO_PALETTE, actions, useStudio } from '../state/useStudio'
+import { AutoSwatch, DeviceIcon, FamilyIcon, PaletteSwatch } from './icons'
+import { Select } from './Select'
+import type { Option } from './Select'
 import type { ParamSpec } from '../engine/types'
 
 function RangeControl({ spec, value }: { spec: Extract<ParamSpec, { type: 'range' }>; value: number }) {
   const id = `p-${spec.key}`
   return (
-    <div className="control">
-      <label className="control__head" htmlFor={id}>
-        <span>{spec.label}</span>
-        <output htmlFor={id}>{value.toFixed(2)}</output>
+    <div className="field">
+      <label className="field__head" htmlFor={id}>
+        <span className="field__label">{spec.label}</span>
+        <output className="field__meta" htmlFor={id}>{value.toFixed(2)}</output>
       </label>
       <input
         id={id}
@@ -27,30 +30,14 @@ function RangeControl({ spec, value }: { spec: Extract<ParamSpec, { type: 'range
   )
 }
 
-function SelectControl({ spec, value }: { spec: Extract<ParamSpec, { type: 'select' }>; value: string }) {
-  const id = `p-${spec.key}`
-  return (
-    <div className="control">
-      <label className="control__head" htmlFor={id}>
-        <span>{spec.label}</span>
-      </label>
-      <select id={id} value={value} onChange={(e) => actions.setParam(spec.key, e.currentTarget.value)}>
-        {spec.options.map((o) => (
-          <option key={o} value={o}>
-            {o.replace(/(^|-)(\w)/g, (_, sep: string, c: string) => (sep ? ' ' : '') + c.toUpperCase())}
-          </option>
-        ))}
-      </select>
-    </div>
-  )
-}
+const title = (s: string) =>
+  s.replace(/(^|-)(\w)/g, (_, sep: string, c: string) => (sep ? ' ' : '') + c.toUpperCase())
 
 export function ControlRail({ id, hidden }: { id?: string; hidden?: boolean } = {}): React.JSX.Element {
   const state = useStudio()
   const renderer = rendererOr(state.styleId)
   const family = getFamily(state.categoryId) ?? FAMILIES[0]
   const resolved = resolveParams(renderer.schema, state.params)
-  // the family owns the palette pool; that is what gives a category its taste
   const pool = characterOf(renderer.family).palettes
   const availablePalettes = PALETTES.filter((p) => pool.includes(p.id))
   const size = resolveSize(state.exportPreset)
@@ -58,105 +45,110 @@ export function ControlRail({ id, hidden }: { id?: string; hidden?: boolean } = 
   /**
    * A palette the previous style allowed but this one does not stays in state,
    * so switching back restores it. The compositor already falls back to its
-   * seeded pick in the meantime, so the select has to show Auto rather than an
-   * option that is not in the list and leave the control looking blank.
+   * seeded pick meanwhile, so the control shows Auto rather than an option that
+   * is not in the list, which would leave it looking blank.
    */
   const shownPalette = availablePalettes.some((p) => p.id === state.paletteId)
     ? state.paletteId
     : AUTO_PALETTE
 
+  const categoryOptions: Option[] = FAMILIES.map((fam) => ({
+    value: fam.id,
+    label: fam.name,
+    icon: <FamilyIcon family={fam.id} />,
+    hint: `${fam.renderers.length}`,
+  }))
+
+  const styleOptions: Option[] = (family?.renderers ?? []).map((r) => ({
+    value: r.id,
+    label: r.name,
+    icon: <FamilyIcon family={r.family} />,
+  }))
+
+  const paletteOptions: Option[] = [
+    { value: AUTO_PALETTE, label: 'Auto', icon: <AutoSwatch />, hint: 'from seed' },
+    ...availablePalettes.map((p) => ({
+      value: p.id,
+      label: p.name,
+      icon: <PaletteSwatch palette={p} />,
+    })),
+  ]
+
+  const sizeOptions: Option[] = PRESETS.map((p) => ({
+    value: p.id,
+    label: p.label,
+    group: p.group,
+    icon: <DeviceIcon group={p.group} />,
+    hint: `${p.width}×${p.height}`,
+  }))
+  if (size.custom) {
+    sizeOptions.push({
+      value: size.id,
+      label: size.label,
+      group: 'Custom',
+      icon: <DeviceIcon group="Desktop" />,
+    })
+  }
+
   return (
     <aside id={id} className="rail" aria-label="Composition controls" hidden={hidden}>
       <div className="rail__section">
-        <div className="control">
-          <label className="control__head" htmlFor="category">
-            <span>Category</span>
-          </label>
-          <select
-            id="category"
-            value={state.categoryId}
-            onChange={(e) => {
-              const next = getFamily(e.currentTarget.value)
-              if (next?.renderers[0]) actions.setStyle(next.renderers[0].id)
-            }}
-          >
-            {FAMILIES.map((fam) => (
-              <option key={fam.id} value={fam.id}>{fam.name}</option>
-            ))}
-          </select>
-        </div>
-
-        <div className="control">
-          <label className="control__head" htmlFor="style">
-            <span>Style</span>
-          </label>
-          <select
-            id="style"
-            value={state.styleId}
-            onChange={(e) => actions.setStyle(e.currentTarget.value)}
-          >
-            {(family?.renderers ?? []).map((r) => (
-              <option key={r.id} value={r.id}>{r.name}</option>
-            ))}
-          </select>
-        </div>
-
-        <div className="control">
-          <label className="control__head" htmlFor="palette">
-            <span>Palette</span>
-          </label>
-          <select
-            id="palette"
-            value={shownPalette}
-            onChange={(e) => actions.setPalette(e.currentTarget.value)}
-          >
-            <option value={AUTO_PALETTE}>Auto (from seed)</option>
-            {availablePalettes.map((p) => (
-              <option key={p.id} value={p.id}>{p.name}</option>
-            ))}
-          </select>
-        </div>
+        <Select
+          id="category"
+          label="Category"
+          value={state.categoryId}
+          options={categoryOptions}
+          onChange={(v) => {
+            const next = getFamily(v)
+            if (next?.renderers[0]) actions.setStyle(next.renderers[0].id)
+          }}
+        />
+        <Select
+          id="style"
+          label="Style"
+          value={state.styleId}
+          options={styleOptions}
+          onChange={(v) => actions.setStyle(v)}
+        />
+        <Select
+          id="palette"
+          label="Colour"
+          value={shownPalette}
+          options={paletteOptions}
+          onChange={(v) => actions.setPalette(v)}
+        />
       </div>
 
       <div className="rail__section">
-        <h2 className="rail__title">{renderer.name}</h2>
+        <h2 className="rail__title">Tune</h2>
         {renderer.schema.map((spec) =>
           spec.type === 'range' ? (
             <RangeControl key={spec.key} spec={spec} value={Number(resolved[spec.key] ?? spec.default)} />
           ) : (
-            <SelectControl key={spec.key} spec={spec} value={String(resolved[spec.key] ?? spec.default)} />
+            <Select
+              key={spec.key}
+              id={`p-${spec.key}`}
+              label={spec.label}
+              value={String(resolved[spec.key] ?? spec.default)}
+              options={spec.options.map((o) => ({ value: o, label: title(o) }))}
+              onChange={(v) => actions.setParam(spec.key, v)}
+            />
           ),
         )}
         <button type="button" className="btn btn--ghost" onClick={() => actions.resetParams()}>
-          Reset parameters
+          Reset
         </button>
       </div>
 
       <div className="rail__section">
-        <div className="control">
-          <label className="control__head" htmlFor="preset">
-            <span>Canvas ratio</span>
-            <output htmlFor="preset">
-              {size.width}&times;{size.height}
-            </output>
-          </label>
-          <select
-            id="preset"
-            value={size.id}
-            onChange={(e) => actions.setExportPreset(e.currentTarget.value)}
-          >
-            {groupedPresets().map(([group, items]) => (
-              <optgroup key={group} label={group}>
-                {items.map((p) => (
-                  <option key={p.id} value={p.id}>{p.label}</option>
-                ))}
-              </optgroup>
-            ))}
-            {/* a custom size set in the export dialog has no preset to match,
-                and without this the select renders with nothing selected */}
-            {size.custom ? <option value={size.id}>{size.label}</option> : null}
-          </select>
-        </div>
+        <Select
+          id="preset"
+          label="Screen"
+          value={size.id}
+          options={sizeOptions}
+          onChange={(v) => actions.setExportPreset(v)}
+          meta={`${size.width}×${size.height}`}
+        />
       </div>
     </aside>
   )

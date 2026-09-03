@@ -1,9 +1,11 @@
 /**
- * Palettes are the loudest signal a category has. Ten of them, shared by every
- * family, is why the whole catalogue read as one texture in different colours:
- * a starfield and a plaid drawn from the same six greys look like siblings no
- * matter how different the geometry is. Families now draw from their own pools
- * (see `family.ts`), so this list is wide enough to give each of them a voice.
+ * Palettes carry most of what a wallpaper feels like.
+ *
+ * The previous set was built out of near-neutral greys with one accent, which
+ * is safe and completely forgettable: on a phone it reads as grey with a smudge
+ * of colour on it. These carry real chroma in the ground, climb to a stop
+ * bright enough to actually draw with, and take an accent chosen to sit against
+ * the ground rather than politely beside it.
  */
 
 export type PaletteMode = 'dark' | 'light' | 'mid'
@@ -16,162 +18,133 @@ export type Palette = {
   ground: string
   /**
    * Five stops ordered by CONTRAST AGAINST THE GROUND, not by luminance:
-   * ramp[0] barely separates from the ground, ramp[4] is the strongest
-   * structural value. Dark palettes run dark -> light, light palettes run
-   * light -> dark, and mid-ground palettes pick whichever direction carries,
-   * which lets every renderer treat ramp(t) as "how present is this element"
-   * without ever branching on mode.
+   * ramp[0] is the first readable step off the ground and ramp[4] is the
+   * strongest structural value. Dark palettes climb, light palettes descend,
+   * and mid grounds take whichever direction carries, so every renderer can
+   * treat ramp(t) as "how present is this element" without branching on mode.
    */
   ramp: readonly [string, string, string, string, string]
-  /** used exactly once per composition */
+  /** used exactly once per composition, and meant to be seen */
   accent: string
-  /** structural line colour, slightly beyond ramp[0] toward the ground */
+  /** structural line colour, just beyond ramp[0] toward the ground */
   ink: string
 }
 
 export const PALETTES: readonly Palette[] = [
-  // --- dark, cool and architectural ---------------------------------------
+  // --- deep and saturated --------------------------------------------------
   {
-    id: 'basalt', name: 'Basalt', mode: 'dark', ground: '#0A0C12',
-    ramp: ['#1E2637', '#303C55', '#4A5B7C', '#6B7EA3', '#9FB0CB'],
-    accent: '#E3A45F', ink: '#070910',
+    id: 'midnight', name: 'Midnight', mode: 'dark', ground: '#0A1028',
+    ramp: ['#1B2450', '#2C3A78', '#4152A4', '#5E70C8', '#93A2E8'],
+    accent: '#FF6F4B', ink: '#070B1C',
   },
   {
-    id: 'graphite', name: 'Graphite', mode: 'dark', ground: '#0D0E10',
-    ramp: ['#202327', '#33383E', '#4B525A', '#6A727C', '#9BA3AD'],
-    accent: '#C7452F', ink: '#090A0C',
+    id: 'indigo', name: 'Indigo', mode: 'dark', ground: '#0E0B24',
+    ramp: ['#221C4E', '#342B78', '#4B3EA6', '#6754CC', '#9C8CEC'],
+    accent: '#4FE0B0', ink: '#0A0819',
   },
   {
-    id: 'indigo', name: 'Indigo', mode: 'dark', ground: '#0B0D1C',
-    ramp: ['#232A4E', '#35406F', '#4A5892', '#6472B4', '#98A4D8'],
-    accent: '#F2AEBE', ink: '#080A16',
+    id: 'abyss', name: 'Abyss', mode: 'dark', ground: '#03151C',
+    ramp: ['#0C2E3C', '#124A5F', '#186A85', '#2090AF', '#4CC4DE'],
+    accent: '#FFC94D', ink: '#020F14',
   },
   {
-    id: 'slate', name: 'Slate', mode: 'dark', ground: '#0C1116',
-    ramp: ['#1B2632', '#2B3B4C', '#405669', '#5D778C', '#90A9BC'],
-    accent: '#E7C86A', ink: '#080D11',
+    id: 'verdigris', name: 'Verdigris', mode: 'dark', ground: '#04160F',
+    ramp: ['#0E3325', '#14523A', '#1C7452', '#26996C', '#4FC796'],
+    accent: '#FFD166', ink: '#030F0A',
   },
   {
-    id: 'obsidian', name: 'Obsidian', mode: 'dark', ground: '#0D0B0C',
-    ramp: ['#241F22', '#3A3338', '#554C52', '#786D75', '#A79DA4'],
-    accent: '#D8524B', ink: '#090708',
+    id: 'moss', name: 'Moss', mode: 'dark', ground: '#0C1408',
+    ramp: ['#1E3213', '#2C4C1C', '#3E6A27', '#548C36', '#7FBB58'],
+    accent: '#FFB03A', ink: '#080E05',
   },
   {
-    id: 'nocturne', name: 'Nocturne', mode: 'dark', ground: '#06080F',
-    ramp: ['#1A2138', '#283358', '#38477B', '#4E60A0', '#8090C8'],
-    accent: '#8FD4E8', ink: '#04050A',
-  },
-
-  // --- dark, warm ----------------------------------------------------------
-  {
-    id: 'ember', name: 'Ember', mode: 'dark', ground: '#120D0B',
-    ramp: ['#2A2119', '#3F3124', '#5A4433', '#7D6046', '#B08A66'],
-    accent: '#E86A42', ink: '#0E0A08',
+    id: 'wine', name: 'Wine', mode: 'dark', ground: '#1A0611',
+    ramp: ['#3A0F27', '#571739', '#7A214F', '#A02F68', '#CF6494'],
+    accent: '#FFCE5C', ink: '#12040C',
   },
   {
-    id: 'rust', name: 'Rust', mode: 'dark', ground: '#14100D',
-    ramp: ['#2C231B', '#423228', '#5E4636', '#82624A', '#B4885F'],
-    accent: '#D9743A', ink: '#0F0C0A',
+    id: 'ember', name: 'Ember', mode: 'dark', ground: '#1A0A05',
+    ramp: ['#3A1A0C', '#582814', '#7C3A1B', '#A45327', '#D68B4E'],
+    accent: '#FFD27D', ink: '#120704',
   },
   {
-    id: 'tobacco', name: 'Tobacco', mode: 'dark', ground: '#131009',
-    ramp: ['#282217', '#3B3222', '#55482F', '#77653F', '#A98F5C'],
-    accent: '#E0B354', ink: '#0E0C07',
+    id: 'plum', name: 'Plum', mode: 'dark', ground: '#150826',
+    ramp: ['#301351', '#48207A', '#6330A4', '#8248C8', '#AF80E6'],
+    accent: '#B6F05E', ink: '#0E0519',
   },
   {
-    id: 'maroon', name: 'Maroon', mode: 'dark', ground: '#150A0D',
-    ramp: ['#2C1720', '#43222E', '#5F3140', '#85465A', '#B76B80'],
-    accent: '#E8B04A', ink: '#100709',
-  },
-
-  // --- dark, green and blue ------------------------------------------------
-  {
-    id: 'verdigris', name: 'Verdigris', mode: 'dark', ground: '#071310',
-    ramp: ['#1B3229', '#27473A', '#35604F', '#487F69', '#74AC92'],
-    accent: '#DFC77C', ink: '#050F0D',
+    id: 'teal', name: 'Teal', mode: 'dark', ground: '#03181B',
+    ramp: ['#0B3439', '#11525A', '#18747E', '#2098A4', '#48C7D2'],
+    accent: '#FF8B5E', ink: '#020F11',
   },
   {
-    id: 'moss', name: 'Moss', mode: 'dark', ground: '#0B1109',
-    ramp: ['#202C1B', '#2F4126', '#405834', '#587548', '#86A96A'],
-    accent: '#D3A84E', ink: '#080D07',
+    id: 'obsidian', name: 'Obsidian', mode: 'dark', ground: '#0C0C10',
+    ramp: ['#1F2029', '#31333F', '#484A5A', '#646779', '#9AA0B4'],
+    accent: '#F2504A', ink: '#08080B',
   },
   {
-    id: 'abyss', name: 'Abyss', mode: 'dark', ground: '#06111A',
-    ramp: ['#163046', '#204461', '#2C5C82', '#3D7AA8', '#6BA6CE'],
-    accent: '#EFCB68', ink: '#040C13',
+    id: 'rust', name: 'Rust', mode: 'dark', ground: '#180D08',
+    ramp: ['#361C10', '#512A18', '#733D21', '#98552E', '#C98B5A'],
+    accent: '#57C9B0', ink: '#100804',
+  },
+  {
+    id: 'cobalt', name: 'Cobalt', mode: 'dark', ground: '#04121F',
+    ramp: ['#0B2A48', '#11406C', '#175B96', '#2079C0', '#4FA8E4'],
+    accent: '#FF9F45', ink: '#030C15',
   },
 
-  // --- dark, violet --------------------------------------------------------
+  // --- mid grounds ---------------------------------------------------------
   {
-    id: 'plum', name: 'Plum', mode: 'dark', ground: '#120A14',
-    ramp: ['#2E1D38', '#402A4C', '#573A66', '#744E86', '#A57BB8'],
-    accent: '#C9E07A', ink: '#0E0810',
+    id: 'clay', name: 'Clay', mode: 'mid', ground: '#B07A55',
+    ramp: ['#9A6544', '#7D4E33', '#5E3826', '#3E241A', '#22140F'],
+    accent: '#FFF0D6', ink: '#2A1810',
   },
   {
-    id: 'orchid', name: 'Orchid', mode: 'dark', ground: '#150B1B',
-    ramp: ['#2C1737', '#402350', '#56316B', '#74468D', '#A76FC0'],
-    accent: '#7BE0C4', ink: '#100813',
-  },
-
-  // --- mid grounds: the range the catalogue was missing entirely -----------
-  {
-    id: 'clay', name: 'Clay', mode: 'mid', ground: '#A08974',
-    ramp: ['#8E7A67', '#75634F', '#5A4B3B', '#3D3227', '#241D16'],
-    accent: '#F2E4CE', ink: '#2A2219',
+    id: 'ocean', name: 'Ocean', mode: 'mid', ground: '#1F5E7A',
+    ramp: ['#2E7592', '#488FAA', '#6BABC2', '#98C9DA', '#D2EAF2'],
+    accent: '#FFC44D', ink: '#12384A',
   },
   {
-    id: 'denim', name: 'Denim', mode: 'mid', ground: '#465A72',
-    ramp: ['#57697F', '#6E7F94', '#8B9AAC', '#AEBAC7', '#DCE4EC'],
-    accent: '#E8A33D', ink: '#22303F',
+    id: 'sage', name: 'Sage', mode: 'mid', ground: '#75906B',
+    ramp: ['#647E5B', '#4F6748', '#3B4E36', '#283524', '#182015'],
+    accent: '#FFF3D2', ink: '#1E2A1A',
   },
   {
-    id: 'olive', name: 'Olive', mode: 'mid', ground: '#7C8464',
-    ramp: ['#6C7457', '#585F46', '#434936', '#2F3427', '#1E2119'],
-    accent: '#F0E0B4', ink: '#22261B',
-  },
-  {
-    id: 'terracotta', name: 'Terracotta', mode: 'mid', ground: '#B0705A',
-    ramp: ['#9C614D', '#82503F', '#663E31', '#492C23', '#2C1A15'],
-    accent: '#F6E7D2', ink: '#331E18',
+    id: 'sunset', name: 'Sunset', mode: 'mid', ground: '#C4553D',
+    ramp: ['#AC452F', '#8D3524', '#6B261A', '#481811', '#290D09'],
+    accent: '#FFE2AE', ink: '#33120C',
   },
 
-  // --- light, neutral ------------------------------------------------------
+  // --- light ---------------------------------------------------------------
   {
-    id: 'bone', name: 'Bone', mode: 'light', ground: '#EFE9DC',
-    ramp: ['#D5CEBE', '#B7AF9C', '#938B78', '#6C6555', '#433E33'],
-    accent: '#A8452C', ink: '#2B2822',
+    id: 'paper', name: 'Paper', mode: 'light', ground: '#F5F0E4',
+    ramp: ['#DCD3BD', '#BCAE90', '#948567', '#665A42', '#3A3224'],
+    accent: '#D6452C', ink: '#2A2418',
   },
   {
-    id: 'chalk', name: 'Chalk', mode: 'light', ground: '#EAE7E4',
-    ramp: ['#CFCAC6', '#AEA8A3', '#877F79', '#5C5551', '#34302D'],
-    accent: '#35618C', ink: '#211E1C',
+    id: 'mist', name: 'Mist', mode: 'light', ground: '#E7EDF1',
+    ramp: ['#C9D6DF', '#A3B7C6', '#7893A8', '#4F6A81', '#2C4154'],
+    accent: '#E4622F', ink: '#22303C',
   },
   {
-    id: 'seafog', name: 'Sea Fog', mode: 'light', ground: '#DEE4E3',
-    ramp: ['#C3CBCA', '#A2ADAD', '#7C8888', '#576161', '#343B3B'],
-    accent: '#B5533F', ink: '#232828',
+    id: 'sand', name: 'Sand', mode: 'light', ground: '#F0E2C6',
+    ramp: ['#DCC79E', '#C2A671', '#9E814C', '#725B32', '#453720'],
+    accent: '#2E7D6B', ink: '#332813',
   },
   {
-    id: 'dune', name: 'Dune', mode: 'light', ground: '#E9DFC9',
-    ramp: ['#D2C5A9', '#B4A484', '#8E7E60', '#665A42', '#3F382A'],
-    accent: '#2F6E63', ink: '#2A2519',
-  },
-
-  // --- light, pop: brighter grounds and louder accents for retro work ------
-  {
-    id: 'sherbet', name: 'Sherbet', mode: 'light', ground: '#F2E5D2',
-    ramp: ['#E4CBAE', '#D6A97F', '#C2805A', '#9B5740', '#5E3128'],
-    accent: '#2E6F6A', ink: '#3A241C',
+    id: 'rose', name: 'Rose', mode: 'light', ground: '#F6E4E1',
+    ramp: ['#E9C7C4', '#D49E9F', '#B4737A', '#874E58', '#502A33'],
+    accent: '#2F7E70', ink: '#37211F',
   },
   {
-    id: 'blush', name: 'Blush', mode: 'light', ground: '#F1E1DE',
-    ramp: ['#E1C4C2', '#CB9E9F', '#AE767B', '#834F58', '#4C2C35'],
-    accent: '#3F7A6B', ink: '#332023',
+    id: 'citron', name: 'Citron', mode: 'light', ground: '#EFF0D6',
+    ramp: ['#DBDDAC', '#BFC27C', '#979B52', '#6B6E34', '#3F421D'],
+    accent: '#C4442C', ink: '#2A2C14',
   },
   {
-    id: 'citron', name: 'Citron', mode: 'light', ground: '#ECEAD3',
-    ramp: ['#D9D6AE', '#BEBB83', '#9A985C', '#6F6E3E', '#414127'],
-    accent: '#B24A34', ink: '#2A2A19',
+    id: 'sherbet', name: 'Sherbet', mode: 'light', ground: '#F8E6D5',
+    ramp: ['#F0C8A6', '#E29F72', '#C87546', '#98502C', '#5C2C17'],
+    accent: '#1F7A76', ink: '#3B2114',
   },
 ]
 

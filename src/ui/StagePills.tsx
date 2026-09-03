@@ -37,8 +37,7 @@ export function StagePills({ onExport }: { onExport: () => void }): React.JSX.El
     : 'Seed unlocked. Shuffle will pick a new seed. Click to lock.'
 
   return (
-    <>
-      <div className="pill pill--actions">
+    <div className="pill pill--actions">
         <button
           type="button"
           className="pill__btn pill__btn--primary"
@@ -67,12 +66,6 @@ export function StagePills({ onExport }: { onExport: () => void }): React.JSX.El
         >
           <ExportIcon />
         </button>
-      </div>
-
-      <p className="pill pill--seed">
-        <span className="pill__label">Seed</span>
-        <span className="pill__seed">{state.seed}</span>
-      </p>
-    </>
+    </div>
   )
 }
