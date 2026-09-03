@@ -2,7 +2,7 @@ import { memo, useEffect, useMemo, useRef } from 'react'
 import { filmstripStyles } from '../engine/registry'
 import { resolveSize } from '../export/presets'
 import { actions, useStudio } from '../state/useStudio'
-import { renderComposition } from './useComposition'
+import { renderComposition, useDebouncedValue } from './useComposition'
 import type { Renderer } from '../engine/types'
 
 /**
@@ -58,6 +58,7 @@ const Thumb = memo(function Thumb({ renderer, seed, paletteId, params, aspect }:
         type="button"
         className="strip__btn"
         onClick={() => actions.setStyle(renderer.id)}
+        aria-label={`Restyle as ${renderer.name}`}
         title={`${renderer.name} — same composition, restyled`}
       >
         <span
@@ -92,6 +93,8 @@ export function Filmstrip(): React.JSX.Element {
   const preset = resolveSize(state.exportPreset)
   const aspect = preset.width / preset.height
   const styles = useMemo(() => filmstripStyles(state.styleId, COUNT), [state.styleId])
+  // trails the main canvas: six thumbnails per slider frame would stall it
+  const params = useDebouncedValue(state.params, 200)
 
   return (
     <nav className="strip" aria-label="Restyle this composition">
@@ -102,7 +105,7 @@ export function Filmstrip(): React.JSX.Element {
             renderer={renderer}
             seed={state.seed}
             paletteId={state.paletteId}
-            params={state.params}
+            params={params}
             aspect={aspect}
           />
         ))}

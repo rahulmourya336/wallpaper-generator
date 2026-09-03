@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { compose } from '../engine/compositor'
 import type { ComposeResult } from '../engine/compositor'
 import { rendererOr } from '../engine/registry'
@@ -80,11 +80,18 @@ export function useDebouncedComposition(
   return result
 }
 
-/** Memoised low-density render for filmstrip thumbnails. */
-export function useThumbnail(req: CompositionRequest): ComposeResult {
-  const key = JSON.stringify([req.styleId, req.seed, req.paletteId, req.params, req.width, req.height])
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  return useMemo(() => renderComposition({ ...req, quality: 0.25 }), [key])
-}
-
 export type { StudioState }
+
+/**
+ * Trailing-edge debounce for a value. The filmstrip needs this: its thumbnails
+ * memoise on the params object, so an undebounced slider drag re-renders six
+ * compositions per frame and stalls the control it is reacting to.
+ */
+export function useDebouncedValue<T>(value: T, delay: number): T {
+  const [settled, setSettled] = useState(value)
+  useEffect(() => {
+    const id = window.setTimeout(() => setSettled(value), delay)
+    return () => window.clearTimeout(id)
+  }, [value, delay])
+  return settled
+}

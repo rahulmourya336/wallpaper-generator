@@ -9,8 +9,10 @@
   --chrome-300: #2a2f36;
   --line: #262b31;
   --text: #ddd8cf;
-  --text-dim: #8d9199;
-  --text-faint: #5d626a;
+  /* Both secondary tones clear 4.5:1 against the two chrome grounds they sit
+     on; the previous faint value measured about 3:1 and failed AA. */
+  --text-dim: #a7abb3;
+  --text-faint: #8a9099;
   --focus: #d8a260;
 
   --rail-w: 22rem;

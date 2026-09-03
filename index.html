@@ -3,13 +3,67 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <title>Wallpaper Studio — Generative Wallpapers</title>
-    <meta name="description" content="Generate original wallpapers in your browser. Pick a style, tune the composition, and export at your exact device resolution." />
-    <meta name="author" content="Rahul Mourya" />
+
+    <title>Wallpaper Studio — Generative Wallpapers for Any Screen</title>
+    <meta
+      name="description"
+      content="Generate original wallpapers in your browser. Pick a style, tune the composition, shuffle for a new one, and export at your exact device resolution. No account, nothing uploaded."
+    />
+    <meta name="author" content="%VITE_AUTHOR%" />
+    <link rel="canonical" href="%VITE_SITE_URL%/" />
     <meta name="theme-color" content="#0b0c0e" />
+    <meta name="color-scheme" content="dark" />
+
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="%VITE_SITE_NAME%" />
+    <meta property="og:title" content="Wallpaper Studio — Generative Wallpapers for Any Screen" />
+    <meta
+      property="og:description"
+      content="Twenty-eight generative styles across ten families. Tune, shuffle, and export at your exact device resolution — entirely in the browser."
+    />
+    <meta property="og:url" content="%VITE_SITE_URL%/" />
+    <meta property="og:image" content="%VITE_SITE_URL%/og.jpg" />
+    <meta property="og:image:type" content="image/jpeg" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="A generative wallpaper: nested arches rendered in a dark desaturated palette." />
+
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Wallpaper Studio — Generative Wallpapers for Any Screen" />
+    <meta
+      name="twitter:description"
+      content="Twenty-eight generative styles across ten families. Tune, shuffle, and export at your exact device resolution — entirely in the browser."
+    />
+    <meta name="twitter:image" content="%VITE_SITE_URL%/og.jpg" />
+
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "WebApplication",
+        "name": "%VITE_SITE_NAME%",
+        "url": "%VITE_SITE_URL%/",
+        "description": "A browser-based generative wallpaper studio. Twenty-eight styles across ten families, tuned with live controls and exported at any device resolution.",
+        "applicationCategory": "DesignApplication",
+        "operatingSystem": "Any",
+        "browserRequirements": "Requires JavaScript and a modern browser",
+        "isAccessibleForFree": true,
+        "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+        "author": { "@type": "Person", "name": "%VITE_AUTHOR%" },
+        "creator": { "@type": "Person", "name": "%VITE_AUTHOR%" }
+      }
+    </script>
   </head>
   <body>
     <div id="root"></div>
+    <noscript>
+      <p style="padding: 2rem; font: 16px system-ui; color: #ddd8cf">
+        Wallpaper Studio renders every wallpaper in your browser, so it needs
+        JavaScript enabled.
+      </p>
+    </noscript>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

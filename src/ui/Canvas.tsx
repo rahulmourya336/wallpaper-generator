@@ -72,7 +72,6 @@ export function Canvas(): React.JSX.Element {
             xmlns="http://www.w3.org/2000/svg"
             dangerouslySetInnerHTML={{ __html: result.inner }}
           />
-          <figcaption className="visually-hidden">{label}</figcaption>
         </figure>
       ) : (
         <div className="canvas-frame canvas-frame--empty" aria-hidden="true" />

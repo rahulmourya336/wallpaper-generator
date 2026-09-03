@@ -50,10 +50,17 @@ export function resolveParams(
   return out
 }
 
+/**
+ * Wall-clock budget by sample density. The thumbnail figure is deliberately
+ * tight: the filmstrip renders six compositions in one synchronous pass, so a
+ * 45ms budget put a visible 300ms stall on every style switch. Renderers bail
+ * out of growth loops gracefully, and at thumbnail scale the missing elements
+ * are not visible.
+ */
 function defaultBudget(quality: number): number {
-  if (quality <= 0.4) return 45
+  if (quality <= 0.4) return 20
   if (quality <= 1.2) return 260
-  return 6000
+  return 20_000
 }
 
 const GRAIN_TILE = 256
