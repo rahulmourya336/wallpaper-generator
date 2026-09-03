@@ -95,7 +95,7 @@ function setAround(seed: string): string[] {
   return [seed, ...Array.from({ length: COUNT - 1 }, () => seedFrom(rng))]
 }
 
-export function Stage(): React.JSX.Element {
+export function Stage({ solo = false }: { solo?: boolean } = {}): React.JSX.Element {
   const state = useStudio()
   const [rowRef, row] = useElementSize<HTMLDivElement>()
   const [candidates, setCandidates] = useState(() => setAround(state.seed))
@@ -119,17 +119,28 @@ export function Stage(): React.JSX.Element {
    * flex layout, which comes from the cells — and the three came out different
    * heights depending on which resolved first.
    */
+  /**
+   * With the controls open there is only one composition worth showing.
+   *
+   * Three candidates share the width, so once the sheet has taken half the
+   * height each one is a postage stamp — and the one being tuned is the only
+   * one changing. Dropping to the selected seed alone gives it the whole row,
+   * which is the difference between watching a slider work and guessing at it.
+   */
+  const shown = solo ? [state.seed] : candidates
+
   const gap = 20
   const cell = useMemo(() => {
     if (row.width < 2 || row.height < 2) return { width: 0, height: 0 }
-    const each = (row.width - gap * (COUNT - 1)) / COUNT
+    const n = Math.max(1, shown.length)
+    const each = (row.width - gap * (n - 1)) / n
     return fitAspect({ width: each, height: row.height }, aspect)
-  }, [row, aspect])
+  }, [row, aspect, shown.length])
 
   return (
-    <div className="stage__row" ref={rowRef} style={{ gap }}>
+    <div className={`stage__row${solo ? ' stage__row--solo' : ''}`} ref={rowRef} style={{ gap }}>
       {cell.width > 1
-        ? candidates.map((seed, i) => (
+        ? shown.map((seed, i) => (
             <Candidate
               key={seed}
               seed={seed}

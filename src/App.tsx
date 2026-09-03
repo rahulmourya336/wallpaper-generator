@@ -35,6 +35,7 @@ export function App(): React.JSX.Element {
   const [exporting, setExporting] = useState(false)
   const [directing, setDirecting] = useState(false)
   const [snap, setSnap] = useState<Snap>('peek')
+  const [sheetH, setSheetH] = useState(PEEK_HEIGHT)
 
   const renderer = rendererOr(state.styleId)
   const family = getFamily(state.categoryId)
@@ -42,7 +43,12 @@ export function App(): React.JSX.Element {
   return (
     <div
       className={`app${isMobile ? ' app--mobile' : ''}`}
-      style={{ '--peek-h': `${PEEK_HEIGHT}px` } as React.CSSProperties}
+      style={{
+        '--peek-h': `${PEEK_HEIGHT}px`,
+        // How much of the sheet is showing. The stage reserves it, so a
+        // composition is never hidden behind the controls that change it.
+        '--sheet-h': `${isMobile ? sheetH : PEEK_HEIGHT}px`,
+      } as React.CSSProperties}
     >
       <header className="topbar">
         <div className="topbar__brand">
@@ -69,7 +75,7 @@ export function App(): React.JSX.Element {
             Pick the one you like
             <span>every design is one of a kind, shuffle for three more</span>
           </p>
-          <Stage />
+          <Stage solo={isMobile && snap !== 'peek'} />
           <StagePills onExport={() => setExporting(true)} />
         </section>
 
@@ -78,6 +84,7 @@ export function App(): React.JSX.Element {
             snap={snap}
             onSnapChange={setSnap}
             peekHeight={PEEK_HEIGHT}
+            onVisibleHeight={setSheetH}
             label="Controls"
           >
             <ControlRail />

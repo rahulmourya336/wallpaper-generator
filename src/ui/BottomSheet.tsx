@@ -1,20 +1,31 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { REDUCED_MOTION_QUERY, useMediaQuery } from './useMediaQuery'
 
-export type Snap = 'peek' | 'expanded'
+export type Snap = 'peek' | 'half' | 'expanded'
 
 /**
- * Two-height draggable sheet.
+ * Three-height draggable sheet.
+ *
+ * Two heights were not enough, and the reason is the whole point of the
+ * control it contains. Opening the sheet to reach a slider covered the
+ * composition the slider was changing, so tuning meant dragging blind and then
+ * collapsing the sheet to find out what you had done. A middle stop leaves the
+ * picture on screen while the controls are in reach, which is the only
+ * arrangement in which a slider is a slider rather than a guess.
  *
  * The sheet is always laid out at its expanded height and translated down to
- * reach the peek position, so its content never reflows while dragging — a
- * sheet that animates its own height re-lays out the filmstrip on every
- * pointer move and drops frames on exactly the interaction it exists for.
+ * reach the shorter stops, so its content never reflows while dragging — a
+ * sheet that animates its own height re-lays out its contents on every pointer
+ * move and drops frames on exactly the interaction it exists for.
  */
+
+const ORDER: readonly Snap[] = ['peek', 'half', 'expanded']
+
 export function BottomSheet({
   snap,
   onSnapChange,
   peekHeight,
+  onVisibleHeight,
   label,
   children,
 }: {
@@ -22,6 +33,13 @@ export function BottomSheet({
   onSnapChange: (snap: Snap) => void
   /** visible height in the peek position, in px */
   peekHeight: number
+  /**
+   * How much of the sheet is showing at rest, so the stage can keep the
+   * composition clear of it. Reported at rest only, never mid-drag: the stage
+   * re-measures and recomposes when it resizes, and doing that on every
+   * pointer move would stall the drag.
+   */
+  onVisibleHeight?: (px: number) => void
   label: string
   children: React.ReactNode
 }): React.JSX.Element {
@@ -29,7 +47,16 @@ export function BottomSheet({
   const [drag, setDrag] = useState<{ startY: number; offset: number } | null>(null)
   const reduced = useMediaQuery(REDUCED_MOTION_QUERY)
 
-  const [height, setHeight] = useState(0)
+  /**
+   * Seeded with the peek height rather than zero.
+   *
+   * The measurement lands in an effect, so on the very first frame the height
+   * is whatever it was initialised to — and a zero there makes `resting` zero,
+   * which is the fully open position. The sheet flashed open on load and then
+   * snapped shut. Starting at the peek height means the first frame is already
+   * the position it is about to settle into.
+   */
+  const [height, setHeight] = useState(peekHeight)
   useEffect(() => {
     const node = ref.current
     if (!node) return
@@ -40,8 +67,21 @@ export function BottomSheet({
     return () => ro.disconnect()
   }, [])
 
-  const restingOffset = snap === 'expanded' ? 0 : Math.max(0, height - peekHeight)
+  const visibleFor = useCallback(
+    (s: Snap) =>
+      s === 'expanded' ? height
+        : s === 'half' ? Math.min(height, Math.max(peekHeight, height * 0.56))
+          : Math.min(height, peekHeight),
+    [height, peekHeight],
+  )
+
+  const visible = visibleFor(snap)
+  const restingOffset = Math.max(0, height - visible)
   const offset = drag ? Math.max(0, Math.min(height, restingOffset + drag.offset)) : restingOffset
+
+  useEffect(() => {
+    onVisibleHeight?.(visible)
+  }, [visible, onVisibleHeight])
 
   const onPointerDown = useCallback((e: React.PointerEvent) => {
     if (e.button !== 0 && e.pointerType === 'mouse') return
@@ -71,17 +111,39 @@ export function BottomSheet({
       } catch {
         /* nothing captured */
       }
-      const travel = Math.max(1, height - peekHeight)
       const landed = restingOffset + drag.offset
-      // a flick beats position: a short fast drag should still change snap
-      const flick = Math.abs(drag.offset) > 40 ? (drag.offset > 0 ? 'peek' : 'expanded') : null
       setDrag(null)
-      onSnapChange(flick ?? (landed > travel / 2 ? 'peek' : 'expanded'))
+
+      // A flick beats position: a short fast drag should still change stop, and
+      // with three stops it moves one step rather than jumping to an end.
+      if (Math.abs(drag.offset) > 40) {
+        const i = ORDER.indexOf(snap)
+        const next = drag.offset > 0 ? Math.max(0, i - 1) : Math.min(ORDER.length - 1, i + 1)
+        onSnapChange(ORDER[next] as Snap)
+        return
+      }
+
+      // otherwise settle on whichever stop the sheet was actually left nearest
+      let best: Snap = snap
+      let bestDist = Infinity
+      for (const s of ORDER) {
+        const d = Math.abs(Math.max(0, height - visibleFor(s)) - landed)
+        if (d < bestDist) {
+          bestDist = d
+          best = s
+        }
+      }
+      onSnapChange(best)
     },
-    [drag, height, peekHeight, restingOffset, onSnapChange],
+    [drag, height, restingOffset, snap, onSnapChange, visibleFor],
   )
 
-  const toggle = () => onSnapChange(snap === 'peek' ? 'expanded' : 'peek')
+  // Tapping the handle steps up through the stops and wraps back to peek, so
+  // the middle position is reachable without knowing the sheet can be dragged.
+  const toggle = () => {
+    const i = ORDER.indexOf(snap)
+    onSnapChange(ORDER[(i + 1) % ORDER.length] as Snap)
+  }
 
   return (
     <aside
@@ -104,8 +166,12 @@ export function BottomSheet({
           type="button"
           className="sheet__handle"
           onClick={toggle}
-          aria-expanded={snap === 'expanded'}
-          aria-label={snap === 'expanded' ? 'Collapse controls' : 'Expand controls'}
+          aria-expanded={snap !== 'peek'}
+          aria-label={
+            snap === 'peek' ? 'Show the controls'
+              : snap === 'half' ? 'Show all the controls'
+                : 'Hide the controls'
+          }
         >
           <span />
         </button>

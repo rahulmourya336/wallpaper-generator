@@ -478,11 +478,26 @@ input[type='number'] {
 
 .app--mobile .studio { display: block; }
 
+/**
+ * The stage reserves whatever the sheet is currently showing.
+ *
+ * Fixed to the peek height, opening the controls buried the composition they
+ * change, so tuning a slider meant dragging blind and then collapsing the
+ * sheet to see the result. Following the sheet instead means the picture is
+ * always on screen — it just gets smaller as the controls get taller.
+ *
+ * The variable only updates when the sheet settles, never mid-drag: the stage
+ * re-measures and recomposes on resize, and doing that per pointer move would
+ * stall the drag. The transition covers the gap.
+ */
 .app--mobile .stage {
   position: absolute;
   inset: 0;
-  padding-bottom: calc(var(--peek-h, 5.75rem) + 3.75rem);
+  padding-bottom: calc(var(--sheet-h, 5.75rem) + 3.75rem);
+  transition: padding-bottom 240ms cubic-bezier(.22,.68,.24,1);
 }
+
+.app--mobile .stage__row--solo { justify-content: center; }
 
 .app--mobile .stage__row { gap: 0.5rem; }
 
@@ -498,7 +513,8 @@ input[type='number'] {
  * the sheet and taking no taps at all.
  */
 .app--mobile .pill--actions {
-  bottom: calc(var(--peek-h, 5.75rem) + 0.55rem);
+  bottom: calc(var(--sheet-h, 5.75rem) + 0.55rem);
+  transition: bottom 240ms cubic-bezier(.22,.68,.24,1);
 }
 
 .sheet {
