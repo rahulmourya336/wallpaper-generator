@@ -133,3 +133,23 @@ export function blob(
 export function lit(ctx: RenderContext, facingAngle: number): number {
   return 0.5 + 0.5 * Math.cos(facingAngle - ctx.light.angle)
 }
+
+/**
+ * Raise a grid cell size until the grid stays under `maxCells`.
+ *
+ * Grid families multiply: halving the cell quadruples the element count. Left
+ * uncapped, the finest setting on a "thread pitch" or "stitch count" slider
+ * produces ten thousand nodes and a megabyte of SVG source, which the
+ * compositor's time budget does not catch because the cost is in parsing and
+ * painting the result rather than in building it.
+ *
+ * `cells` is computed from px that all scale together, so the cap lands at the
+ * same value from thumbnail to 4x export and the composition stays
+ * deterministic. Defaults sit well inside every cap, so this only bites at the
+ * extremes it exists for.
+ */
+export function capCell(ctx: RenderContext, cell: number, maxCells: number): number {
+  if (!(cell > 0)) return Math.max(1, ctx.u(20))
+  const cells = (ctx.w / cell) * (ctx.h / cell)
+  return cells <= maxCells ? cell : cell * Math.sqrt(cells / maxCells)
+}

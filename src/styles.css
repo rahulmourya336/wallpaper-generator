@@ -166,17 +166,6 @@ body {
 .strip__btn:hover .strip__frame { box-shadow: 0 0 0 1px #ffffff40; }
 .strip__btn:hover .strip__label { color: var(--text); }
 
-.strip__svg,
-.strip__raster {
-  position: absolute;
-  inset: 0;
-  display: block;
-  width: 100%;
-  height: 100%;
-}
-
-.strip__svg svg { width: 100%; height: 100%; display: block; }
-
 .strip__label {
   display: block;
   max-width: 6.5rem;
@@ -203,21 +192,19 @@ body {
 }
 
 .canvas-frame--empty {
-  width: min(38vh, 100%);
-  aspect-ratio: 1179 / 2556;
+  height: min(100%, 60vh);
   background: var(--chrome-100);
 }
 
-.canvas-svg,
-.canvas-raster {
-  display: block;
-}
-
-.canvas-svg { position: relative; }
-
-.canvas-raster {
+/* every composition surface: the raster layer canvas families paint, and
+   the SVG that sits on top of it */
+.composition__svg,
+.composition__raster {
   position: absolute;
   inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
 }
 
 /* --- pills ---------------------------------------------------------------- */
@@ -496,16 +483,6 @@ input[type='range']::-moz-range-thumb {
 
 .crop.is-active .crop__frame { box-shadow: 0 0 0 2px var(--focus); }
 
-.crop__svg,
-.crop__raster {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-}
-
-.crop__svg svg { width: 100%; height: 100%; display: block; }
-
 .crop__zones { position: absolute; inset: 0; }
 
 .crop__zone {
@@ -570,6 +547,8 @@ input[type='range']::-moz-range-thumb {
 
 .chip {
   flex: 1 1 auto;
+  display: grid;
+  place-items: center;
   padding: 0.45rem 0.2rem;
   font: inherit;
   font-size: 0.72rem;
@@ -578,6 +557,14 @@ input[type='range']::-moz-range-thumb {
   border: 1px solid var(--line);
   border-radius: var(--radius);
   cursor: pointer;
+}
+
+.chip:hover { color: var(--text); border-color: var(--chrome-300); }
+
+/* the real radio inside is visually hidden, so carry its focus ring here */
+.chip:focus-within {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
 }
 
 .chip.is-active {
@@ -702,7 +689,9 @@ input[type='number'] {
   position: absolute;
   inset: 0;
   padding: 0;
-  padding-bottom: 10.5rem;
+  /* --peek-h is set from the same constant the sheet is given, so the canvas
+     and the sheet cannot drift apart */
+  padding-bottom: calc(var(--peek-h, 10.5rem) + 0.5rem);
 }
 
 .stage--bleed .canvas-frame { border-radius: 0; box-shadow: none; }
@@ -772,3 +761,10 @@ input[type='number'] {
   .pill--seed { right: 0.75rem; top: max(0.75rem, env(safe-area-inset-top)); }
   .rail-toggle { display: none; }
 }
+
+input[type='range']:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.chip:has(input:disabled) { opacity: 0.4; cursor: not-allowed; }

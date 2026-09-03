@@ -41,14 +41,18 @@ function render(ctx: RenderContext): Scene {
   }
 
   const drops = Math.max(1, Math.round(lerp(1, 5, dropsK)))
-  const samples = Math.max(36, Math.round(84 * Math.max(0.4, ctx.quality ** 0.5)))
+  // Every ring is a spline of this many cubic segments, so the number
+  // multiplies straight into document size: at 84 samples across five drops
+  // the source passed a megabyte, which costs far more to parse than the extra
+  // smoothness is worth.
+  const samples = Math.max(28, Math.round(56 * Math.max(0.4, ctx.quality ** 0.5)))
   let accent: string | undefined
   let accentScore = Infinity
 
   for (let d = 0; d < drops; d++) {
     const dx = d === 0 ? focal.cx : focal.cx + skel.range(-1, 1) * w * 0.42
     const dy = d === 0 ? focal.cy : focal.cy + skel.range(-1, 1) * h * 0.3
-    const rings = Math.round(lerp(10, 42, densityK))
+    const rings = Math.max(6, Math.round(lerp(10, 42, densityK) / Math.sqrt(drops)))
     const rMax = ctx.short * lerp(0.35, 1.05, densityK) * skel.range(0.8, 1.3)
 
     for (let i = 1; i <= rings; i++) {

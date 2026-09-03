@@ -1,8 +1,9 @@
-import { memo, useEffect, useMemo, useRef } from 'react'
+import { memo, useMemo } from 'react'
 import { filmstripStyles } from '../engine/registry'
 import { resolveSize } from '../export/presets'
 import { actions, useStudio } from '../state/useStudio'
-import { renderComposition, useDebouncedValue } from './useComposition'
+import { CompositionView } from './CompositionView'
+import { paramsKey, renderComposition, useDebouncedValue } from './useComposition'
 import type { Renderer } from '../engine/types'
 
 /**
@@ -12,8 +13,8 @@ import type { Renderer } from '../engine/types'
  * not a catalogue of what the style looks like in general.
  *
  * Thumbnails render at a quarter sample density and memoise on
- * (styleId, seed, palette, params) — without that the strip re-renders six
- * compositions on every slider frame and stalls the main canvas.
+ * (styleId, seed, palette, params). Without that the strip recomposes six
+ * wallpapers on every slider frame and stalls the main canvas.
  */
 
 const THUMB_SHORT = 380
@@ -29,28 +30,18 @@ type ThumbProps = {
 
 const Thumb = memo(function Thumb({ renderer, seed, paletteId, params, aspect }: ThumbProps) {
   const width = THUMB_SHORT
-  const height = Math.round(width / aspect)
-  const paramKey = JSON.stringify(params)
+  const height = Math.max(1, Math.round(width / aspect))
+  const key = paramsKey(params)
 
   const result = useMemo(
     () =>
       renderComposition({
         styleId: renderer.id, seed, paletteId, params, width, height, quality: 0.25,
       }),
-    // paramKey stands in for params; the rest are primitives
+    // key stands in for params; everything else here is a primitive
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [renderer.id, seed, paletteId, paramKey, width, height],
+    [renderer.id, seed, paletteId, key, width, height],
   )
-
-  const canvasRef = useRef<HTMLCanvasElement | null>(null)
-  useEffect(() => {
-    const node = canvasRef.current
-    if (!node || !result.paint) return
-    const c = node.getContext('2d')
-    if (!c) return
-    c.clearRect(0, 0, result.width, result.height)
-    result.paint(c)
-  }, [result])
 
   return (
     <li className="strip__item">
@@ -59,28 +50,13 @@ const Thumb = memo(function Thumb({ renderer, seed, paletteId, params, aspect }:
         className="strip__btn"
         onClick={() => actions.setStyle(renderer.id)}
         aria-label={`Restyle as ${renderer.name}`}
-        title={`${renderer.name} — same composition, restyled`}
+        title={`${renderer.name}: same composition, restyled`}
       >
         <span
           className="strip__frame"
           style={{ aspectRatio: `${aspect}`, background: result.palette.ground }}
         >
-          {result.paint ? (
-            <canvas
-              ref={canvasRef}
-              className="strip__raster"
-              width={result.width}
-              height={result.height}
-              aria-hidden="true"
-            />
-          ) : null}
-          <span
-            className="strip__svg"
-            aria-hidden="true"
-            dangerouslySetInnerHTML={{
-              __html: result.svg.replace('<svg ', '<svg preserveAspectRatio="xMidYMid slice" '),
-            }}
-          />
+          <CompositionView result={result} fit="slice" />
         </span>
         <span className="strip__label">{renderer.name}</span>
       </button>
@@ -90,8 +66,8 @@ const Thumb = memo(function Thumb({ renderer, seed, paletteId, params, aspect }:
 
 export function Filmstrip(): React.JSX.Element {
   const state = useStudio()
-  const preset = resolveSize(state.exportPreset)
-  const aspect = preset.width / preset.height
+  const size = resolveSize(state.exportPreset)
+  const aspect = size.width / size.height
   const styles = useMemo(() => filmstripStyles(state.styleId, COUNT), [state.styleId])
   // trails the main canvas: six thumbnails per slider frame would stall it
   const params = useDebouncedValue(state.params, 200)

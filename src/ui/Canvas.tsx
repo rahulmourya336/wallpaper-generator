@@ -1,27 +1,26 @@
-import { useEffect, useMemo, useRef } from 'react'
+import { useMemo } from 'react'
 import { resolveSize } from '../export/presets'
 import { rendererOr } from '../engine/registry'
 import { useStudio } from '../state/useStudio'
+import { CompositionView } from './CompositionView'
 import { PREVIEW_MAX_SHORT, fitAspect, useDebouncedComposition } from './useComposition'
 import { useElementSize } from './useElementSize'
 
 export function Canvas(): React.JSX.Element {
   const state = useStudio()
   const [boxRef, box] = useElementSize<HTMLDivElement>()
-  const preset = resolveSize(state.exportPreset)
+  const size = resolveSize(state.exportPreset)
   const renderer = rendererOr(state.styleId)
-  const aspect = preset.width / preset.height
+  const aspect = size.width / size.height
 
-  /** what the browser lays out */
-  const display = useMemo(() => fitAspect(box, aspect), [box, aspect])
   /** what the compositor actually draws, so line weights match the export */
   const render = useMemo(
-    () => fitAspect({ width: preset.width, height: preset.height }, aspect, PREVIEW_MAX_SHORT),
-    [preset.width, preset.height, aspect],
+    () => fitAspect({ width: size.width, height: size.height }, aspect, PREVIEW_MAX_SHORT),
+    [size.width, size.height, aspect],
   )
 
   const result = useDebouncedComposition(
-    display.width > 1
+    box.width > 1 && render.width > 1
       ? {
           styleId: state.styleId,
           seed: state.seed,
@@ -33,48 +32,36 @@ export function Canvas(): React.JSX.Element {
       : null,
   )
 
-  const canvasRef = useRef<HTMLCanvasElement | null>(null)
-  useEffect(() => {
-    const node = canvasRef.current
-    if (!node || !result?.paint) return
-    node.width = result.width
-    node.height = result.height
-    const c = node.getContext('2d')
-    if (!c) return
-    c.clearRect(0, 0, result.width, result.height)
-    result.paint(c)
-  }, [result])
+  /**
+   * The frame follows the composition that is actually on screen, not the
+   * ratio that was just picked. Sizing it from the pending aspect stretches
+   * the previous render for the length of the debounce every time the size
+   * preset changes.
+   */
+  const shown = result ? result.width / result.height : aspect
+  const display = useMemo(() => fitAspect(box, shown), [box, shown])
 
-  const label = `${renderer.name} wallpaper, seed ${state.seed}, ${preset.width} by ${preset.height} pixels`
-  const boxStyle = { width: display.width, height: display.height }
+  const label = `${renderer.name} wallpaper, seed ${state.seed}, ${size.width} by ${size.height} pixels`
 
   return (
     <div className="canvas-fit" ref={boxRef}>
       {result && display.width > 1 ? (
         <figure
           className="canvas-frame"
-          style={{ ...boxStyle, background: result.palette.ground }}
+          style={{
+            width: display.width,
+            height: display.height,
+            background: result.palette.ground,
+          }}
         >
-          {result.paint ? (
-            <canvas
-              ref={canvasRef}
-              className="canvas-raster"
-              style={boxStyle}
-              aria-hidden="true"
-            />
-          ) : null}
-          <svg
-            className="canvas-svg"
-            role="img"
-            aria-label={label}
-            style={boxStyle}
-            viewBox={`0 0 ${result.width} ${result.height}`}
-            xmlns="http://www.w3.org/2000/svg"
-            dangerouslySetInnerHTML={{ __html: result.inner }}
-          />
+          <CompositionView result={result} label={label} />
         </figure>
       ) : (
-        <div className="canvas-frame canvas-frame--empty" aria-hidden="true" />
+        <div
+          className="canvas-frame canvas-frame--empty"
+          style={{ aspectRatio: `${aspect}` }}
+          aria-hidden="true"
+        />
       )}
     </div>
   )

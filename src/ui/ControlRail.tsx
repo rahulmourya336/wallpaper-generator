@@ -50,6 +50,17 @@ export function ControlRail({ id, hidden }: { id?: string; hidden?: boolean } = 
   const family = getFamily(state.categoryId) ?? FAMILIES[0]
   const resolved = resolveParams(renderer.schema, state.params)
   const availablePalettes = PALETTES.filter((p) => renderer.palettes.includes(p.id))
+  const size = resolveSize(state.exportPreset)
+
+  /**
+   * A palette the previous style allowed but this one does not stays in state,
+   * so switching back restores it. The compositor already falls back to its
+   * seeded pick in the meantime, so the select has to show Auto rather than an
+   * option that is not in the list and leave the control looking blank.
+   */
+  const shownPalette = availablePalettes.some((p) => p.id === state.paletteId)
+    ? state.paletteId
+    : AUTO_PALETTE
 
   return (
     <aside id={id} className="rail" aria-label="Composition controls" hidden={hidden}>
@@ -93,7 +104,7 @@ export function ControlRail({ id, hidden }: { id?: string; hidden?: boolean } = 
           </label>
           <select
             id="palette"
-            value={state.paletteId}
+            value={shownPalette}
             onChange={(e) => actions.setPalette(e.currentTarget.value)}
           >
             <option value={AUTO_PALETTE}>Auto (from seed)</option>
@@ -123,12 +134,12 @@ export function ControlRail({ id, hidden }: { id?: string; hidden?: boolean } = 
           <label className="control__head" htmlFor="preset">
             <span>Canvas ratio</span>
             <output htmlFor="preset">
-              {resolveSize(state.exportPreset).width}&times;{resolveSize(state.exportPreset).height}
+              {size.width}&times;{size.height}
             </output>
           </label>
           <select
             id="preset"
-            value={state.exportPreset}
+            value={size.id}
             onChange={(e) => actions.setExportPreset(e.currentTarget.value)}
           >
             {groupedPresets().map(([group, items]) => (
@@ -138,6 +149,9 @@ export function ControlRail({ id, hidden }: { id?: string; hidden?: boolean } = 
                 ))}
               </optgroup>
             ))}
+            {/* a custom size set in the export dialog has no preset to match,
+                and without this the select renders with nothing selected */}
+            {size.custom ? <option value={size.id}>{size.label}</option> : null}
           </select>
         </div>
       </div>

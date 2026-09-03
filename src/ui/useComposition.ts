@@ -15,7 +15,49 @@ export type CompositionRequest = {
   quality?: number
 }
 
+/**
+ * Stable key for a params bag. Object key order follows insertion, so a bag
+ * rebuilt from the URL hash and one built by moving sliders can serialise
+ * differently while meaning the same thing; sorting makes memo and cache keys
+ * agree with the compositor, which ignores order entirely.
+ */
+export function paramsKey(params: Record<string, number | string>): string {
+  const keys = Object.keys(params).sort()
+  let out = ''
+  for (const k of keys) out += `${k}=${String(params[k])};`
+  return out
+}
+
+function compositionKey(req: CompositionRequest): string {
+  return [
+    req.styleId, req.seed, req.paletteId,
+    req.width, req.height, req.quality ?? 1,
+    paramsKey(req.params),
+  ].join('|')
+}
+
+/**
+ * Small LRU over composed results. Compositions are pure in their request, so
+ * revisiting one is free: switching styles back and forth in the filmstrip,
+ * stepping back through shuffles with the browser's back button, and reopening
+ * the export dialog all hit the cache instead of recomposing.
+ *
+ * The cap is deliberately low. A main-canvas result carries tens of kilobytes
+ * of SVG source, and holding a long tail of them costs more than it saves.
+ */
+const CACHE_LIMIT = 24
+const cache = new Map<string, ComposeResult>()
+
 export function renderComposition(req: CompositionRequest): ComposeResult {
+  const key = compositionKey(req)
+  const hit = cache.get(key)
+  if (hit) {
+    // refresh recency
+    cache.delete(key)
+    cache.set(key, hit)
+    return hit
+  }
+
   const input: Parameters<typeof compose>[0] = {
     renderer: rendererOr(req.styleId),
     seed: req.seed,
@@ -24,7 +66,14 @@ export function renderComposition(req: CompositionRequest): ComposeResult {
     quality: req.quality ?? 1,
   }
   if (req.paletteId !== AUTO_PALETTE) input.paletteId = req.paletteId
-  return compose(input)
+
+  const result = compose(input)
+  cache.set(key, result)
+  if (cache.size > CACHE_LIMIT) {
+    const oldest = cache.keys().next().value
+    if (oldest !== undefined) cache.delete(oldest)
+  }
+  return result
 }
 
 /**
@@ -43,7 +92,9 @@ export function fitAspect(
   aspect: number,
   maxShort = 900,
 ): { width: number; height: number } {
-  if (box.width <= 0 || box.height <= 0) return { width: 0, height: 0 }
+  if (box.width <= 0 || box.height <= 0 || !Number.isFinite(aspect) || aspect <= 0) {
+    return { width: 0, height: 0 }
+  }
   let w = box.width
   let h = w / aspect
   if (h > box.height) {
@@ -64,13 +115,17 @@ export function useDebouncedComposition(
   req: CompositionRequest | null,
   delay = 60,
 ): ComposeResult | null {
-  const key = req
-    ? JSON.stringify([req.styleId, req.seed, req.paletteId, req.params, req.width, req.height, req.quality])
-    : ''
+  const key = req ? compositionKey(req) : ''
   const [result, setResult] = useState<ComposeResult | null>(null)
 
   useEffect(() => {
     if (!req || req.width < 2 || req.height < 2) return
+    // A cached request needs no debounce: it is already paid for, and waiting
+    // makes the back button and repeated style switches feel laggy for nothing.
+    if (cache.has(key)) {
+      setResult(renderComposition(req))
+      return
+    }
     const id = window.setTimeout(() => setResult(renderComposition(req)), delay)
     return () => window.clearTimeout(id)
     // key captures every field of req that affects the output
@@ -79,8 +134,6 @@ export function useDebouncedComposition(
 
   return result
 }
-
-export type { StudioState }
 
 /**
  * Trailing-edge debounce for a value. The filmstrip needs this: its thumbnails
@@ -95,3 +148,5 @@ export function useDebouncedValue<T>(value: T, delay: number): T {
   }, [value, delay])
   return settled
 }
+
+export type { StudioState }

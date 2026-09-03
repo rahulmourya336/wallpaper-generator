@@ -1,9 +1,17 @@
 export type AttrValue = string | number | undefined | null | false
 
-/** Two decimals keeps the serialized document small without visible snapping. */
+/**
+ * Coordinate precision, traded against document size.
+ *
+ * Small numbers are stroke widths and offsets and keep two decimals; anything
+ * past a hundred is a position, where a hundredth of a pixel is invisible and
+ * the extra digits are pure weight. Across a few hundred thousand numbers that
+ * is a measurable slice of the parse cost on every render.
+ */
 export function f(n: number): string {
   if (!Number.isFinite(n)) return '0'
-  const r = Math.round(n * 100) / 100
+  const p = Math.abs(n) >= 100 ? 10 : 100
+  const r = Math.round(n * p) / p
   return Object.is(r, -0) ? '0' : String(r)
 }
 

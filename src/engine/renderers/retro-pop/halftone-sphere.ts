@@ -1,4 +1,5 @@
 import { circlePath, el, f, clamp, lerp } from '../../svg'
+import { capCell } from '../../sampling'
 import { withAlpha } from '../../palette'
 import type { ParamSchema, RenderContext, Renderer, Scene } from '../../types'
 
@@ -30,7 +31,7 @@ function render(ctx: RenderContext): Scene {
   const subject: string[] = []
   const front: string[] = []
 
-  const pitch = u(lerp(46, 15, densityK))
+  const pitch = capCell(ctx, u(lerp(46, 15, densityK)), 4200)
   const R = Math.max(focal.rx, focal.ry)
   const dotMax = pitch * 0.52
 

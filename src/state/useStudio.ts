@@ -129,7 +129,7 @@ function emit(): void {
   for (const l of listeners) l()
 }
 
-function syncHash(replace: boolean): void {
+function writeHash(replace: boolean): void {
   if (typeof location === 'undefined') return
   const next = `#${encodeHash(state)}`
   if (next === location.hash) return
@@ -141,6 +141,45 @@ function syncHash(replace: boolean): void {
   setTimeout(() => { writingHash = false }, 0)
 }
 
+/**
+ * Replacements are coalesced; pushes go straight through.
+ *
+ * Dragging a slider changes state on every pointer move, and one
+ * history.replaceState per move is both wasted work and a real limit: Safari
+ * throws once a document exceeds about a hundred history writes in thirty
+ * seconds, which a single sustained drag will do. Pushes come from discrete
+ * actions (shuffle, restyle) and must land immediately so the back button
+ * steps through them one at a time.
+ */
+const HASH_COALESCE_MS = 150
+let hashTimer = 0
+let hashPending = false
+
+function cancelPendingHash(): void {
+  if (typeof window === 'undefined') return
+  window.clearTimeout(hashTimer)
+  hashTimer = 0
+  hashPending = false
+}
+
+function flushHash(): void {
+  const pending = hashPending
+  cancelPendingHash()
+  if (pending) writeHash(true)
+}
+
+function syncHash(replace: boolean): void {
+  if (typeof window === 'undefined') return
+  if (!replace) {
+    cancelPendingHash()
+    writeHash(false)
+    return
+  }
+  hashPending = true
+  if (hashTimer) return
+  hashTimer = window.setTimeout(flushHash, HASH_COALESCE_MS)
+}
+
 function set(patch: Partial<StudioState>, opts: { push?: boolean } = {}): void {
   state = { ...state, ...patch }
   syncHash(!opts.push)
@@ -150,10 +189,18 @@ function set(patch: Partial<StudioState>, opts: { push?: boolean } = {}): void {
 if (typeof window !== 'undefined') {
   window.addEventListener('hashchange', () => {
     if (writingHash) return
+    // an incoming navigation wins: a queued write is stale by definition, and
+    // flushing it here would immediately overwrite the URL we just arrived at
+    cancelPendingHash()
     state = decodeHash(location.hash, state.seed)
     emit()
   })
-  syncHash(true)
+  // a coalesced write must not be lost to a navigation or a backgrounded tab
+  window.addEventListener('pagehide', flushHash)
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') flushHash()
+  })
+  writeHash(true)
 }
 
 export function getState(): StudioState {

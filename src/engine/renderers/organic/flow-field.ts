@@ -57,7 +57,7 @@ function render(ctx: RenderContext): Scene {
     if (field.next() > d) continue
     const fall = ctx.falloff(x, y)
 
-    const steps = Math.max(4, Math.round(lerp(8, 70, flowK) * (0.3 + 0.7 * fall)))
+    const steps = Math.max(4, Math.round(lerp(8, 46, flowK) * (0.3 + 0.7 * fall)))
     const pts = streamline(ctx, { x, y }, angleAt, steps, step)
     if (pts.length < 8) continue
     const path = smooth(pts, 0.5)

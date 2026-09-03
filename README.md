@@ -20,9 +20,11 @@ npm run preview
 
 Node 20+.
 
-**Before deploying, set `VITE_SITE_URL` in `.env`.** It is the single source of
-truth for the canonical link, the Open Graph and Twitter tags, and the
-generated `robots.txt` and `sitemap.xml`. The committed value is a placeholder.
+Deployed at <https://wallpaper-genx.vercel.app/>.
+
+`VITE_SITE_URL` in `.env` is the single source of truth for the canonical link,
+the Open Graph and Twitter tags, and the generated `robots.txt` and
+`sitemap.xml`. Change that one line to point at a different domain.
 
 ## How it fits together
 

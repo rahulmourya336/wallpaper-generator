@@ -1,4 +1,5 @@
 import { el, f, lerp } from '../../svg'
+import { capCell } from '../../sampling'
 import { withAlpha } from '../../palette'
 import type { ParamSchema, RenderContext, Renderer, Scene } from '../../types'
 
@@ -34,7 +35,8 @@ function render(ctx: RenderContext): Scene {
   const subject: string[] = []
   const front: string[] = []
 
-  const cell = u(lerp(190, 52, cellK))
+  // the iso lattice packs about eight blocks into the area of one square cell
+  const cell = capCell(ctx, u(lerp(190, 52, cellK)), 190)
   const hw = cell * 0.5
   const hh = cell * 0.26
 

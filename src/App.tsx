@@ -38,7 +38,10 @@ export function App(): React.JSX.Element {
   const openExport = () => setExporting(true)
 
   return (
-    <div className={`app${isMobile ? ' app--mobile' : ''}`}>
+    <div
+      className={`app${isMobile ? ' app--mobile' : ''}`}
+      style={{ '--peek-h': `${PEEK_HEIGHT}px` } as React.CSSProperties}
+    >
       {isMobile ? null : (
         <header className="topbar">
           <h1 className="topbar__title">
@@ -50,7 +53,7 @@ export function App(): React.JSX.Element {
 
       {isMobile ? (
         <main className="studio studio--mobile">
-          <h1 className="visually-hidden">Wallpaper Studio — generative wallpapers</h1>
+          <h1 className="visually-hidden">Wallpaper Studio: generative wallpapers</h1>
           <section className="stage stage--bleed" aria-label="Wallpaper preview">
             <div className="stage__canvas">
               <Canvas />

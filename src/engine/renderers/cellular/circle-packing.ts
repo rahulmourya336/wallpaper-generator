@@ -36,7 +36,7 @@ function render(ctx: RenderContext): Scene {
 
   const rMax = u(lerp(28, 105, scaleK))
   const circles = packCircles(ctx, {
-    target: Math.round(lerp(180, 620, densityK) * Math.max(0.3, ctx.quality ** 0.6)),
+    target: Math.round(lerp(180, 460, densityK) * Math.max(0.3, ctx.quality ** 0.6)),
     rMin: rMax * 0.11,
     rMax,
     padding: u(2),

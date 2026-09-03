@@ -6,7 +6,8 @@ import {
 import { FORMATS, checkSize, downloadBlob, filenameFor, runExport } from '../export/rasterize'
 import type { ExportFormat, ExportPhase } from '../export/rasterize'
 import { AUTO_PALETTE, actions, useStudio } from '../state/useStudio'
-import { renderComposition } from './useComposition'
+import { CompositionView } from './CompositionView'
+import { paramsKey, renderComposition, useDebouncedValue } from './useComposition'
 
 /**
  * The three ratio previews are re-rendered, not cropped.
@@ -18,6 +19,8 @@ import { renderComposition } from './useComposition'
  */
 
 const PREVIEW_WIDTH = 420
+const MIN_EDGE = 16
+const MAX_EDGE = 16384
 
 type PreviewProps = {
   styleId: string
@@ -33,10 +36,10 @@ type PreviewProps = {
 
 const RatioPreview = memo(function RatioPreview(props: PreviewProps) {
   const { width, height, label, showSafeZones, active } = props
-  const paramKey = JSON.stringify(props.params)
+  const key = paramsKey(props.params)
   const aspect = width / height
   const renderW = PREVIEW_WIDTH
-  const renderH = Math.round(renderW / aspect)
+  const renderH = Math.max(1, Math.round(renderW / aspect))
 
   const result = useMemo(
     () =>
@@ -45,36 +48,16 @@ const RatioPreview = memo(function RatioPreview(props: PreviewProps) {
         params: props.params, width: renderW, height: renderH, quality: 0.25,
       }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [props.styleId, props.seed, props.paletteId, paramKey, renderW, renderH],
+    [props.styleId, props.seed, props.paletteId, key, renderW, renderH],
   )
-
-  const canvasRef = useRef<HTMLCanvasElement | null>(null)
-  useEffect(() => {
-    const node = canvasRef.current
-    if (!node || !result.paint) return
-    const c = node.getContext('2d')
-    if (!c) return
-    c.clearRect(0, 0, result.width, result.height)
-    result.paint(c)
-  }, [result])
 
   return (
     <figure className={`crop${active ? ' is-active' : ''}`}>
-      <div className="crop__frame" style={{ aspectRatio: `${aspect}`, background: result.palette.ground }}>
-        {result.paint ? (
-          <canvas
-            ref={canvasRef}
-            className="crop__raster"
-            width={result.width}
-            height={result.height}
-            aria-hidden="true"
-          />
-        ) : null}
-        <div
-          className="crop__svg"
-          aria-hidden="true"
-          dangerouslySetInnerHTML={{ __html: result.svg }}
-        />
+      <div
+        className="crop__frame"
+        style={{ aspectRatio: `${aspect}`, background: result.palette.ground }}
+      >
+        <CompositionView result={result} />
         {showSafeZones ? (
           <div className="crop__zones" aria-hidden="true">
             {safeZones(groupForRatio(width, height)).map((z) => (
@@ -96,9 +79,25 @@ const RatioPreview = memo(function RatioPreview(props: PreviewProps) {
   )
 })
 
-export function ExportDialog({ open, onClose }: { open: boolean; onClose: () => void }): React.JSX.Element {
+const PHASE_LABEL: Record<ExportPhase, string> = {
+  idle: '',
+  composing: 'Rendering at full size…',
+  rasterizing: 'Rasterising…',
+  encoding: 'Encoding…',
+  done: 'Saved',
+  error: 'Failed',
+}
+
+export function ExportDialog({
+  open,
+  onClose,
+}: {
+  open: boolean
+  onClose: () => void
+}): React.JSX.Element {
   const state = useStudio()
   const ref = useRef<HTMLDialogElement | null>(null)
+  const doneTimer = useRef(0)
   const size = resolveSize(state.exportPreset)
 
   const [format, setFormat] = useState<ExportFormat>('png')
@@ -108,22 +107,42 @@ export function ExportDialog({ open, onClose }: { open: boolean; onClose: () => 
   const [phase, setPhase] = useState<ExportPhase>('idle')
   const [error, setError] = useState<string | null>(null)
 
+  // previews follow the sliders rather than racing them, same as the filmstrip
+  const previewParams = useDebouncedValue(state.params, 200)
+
   useEffect(() => {
     const node = ref.current
     if (!node) return
-    if (open && !node.open) node.showModal()
+    if (open && !node.open) {
+      node.showModal()
+      // a dialog reopened after a failure should not still be showing it
+      setPhase('idle')
+      setError(null)
+      setCustom({ width: size.width, height: size.height })
+    }
     if (!open && node.open) node.close()
+    // deliberately keyed on `open` only: re-syncing on every size change would
+    // fight the user while they are typing a custom size
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open])
 
-  const check = checkSize(size.width, size.height, scale)
+  useEffect(() => () => window.clearTimeout(doneTimer.current), [])
+
+  /**
+   * SVG ignores scale: it composes once at the nominal size and the viewBox
+   * does the rest. Feeding the slider value through anyway made the dialog
+   * quote 1x dimensions while the exporter composed at 4x.
+   */
+  const effectiveScale = format === 'svg' ? 1 : scale
+  const check = checkSize(size.width, size.height, effectiveScale)
   const busy = phase === 'composing' || phase === 'rasterizing' || phase === 'encoding'
 
   // A typed value outside the range is kept in the field but not applied, so
-  // the message has to say so — silently ignoring it looks like a dead input.
-  const customValid = (v: number) => Number.isFinite(v) && v >= 16 && v <= 16384
+  // the message has to say so; silently ignoring it looks like a dead input.
+  const customValid = (v: number) => Number.isFinite(v) && v >= MIN_EDGE && v <= MAX_EDGE
   const customError =
     size.custom && !(customValid(custom.width) && customValid(custom.height))
-      ? 'Each edge must be between 16 and 16,384px. Showing the last valid size.'
+      ? `Each edge must be between ${MIN_EDGE} and ${MAX_EDGE.toLocaleString()}px. Showing the last valid size.`
       : null
 
   const commitCustom = (width: number, height: number) => {
@@ -136,33 +155,27 @@ export function ExportDialog({ open, onClose }: { open: boolean; onClose: () => 
   const onExport = async () => {
     setError(null)
     try {
-      const req = {
-        styleId: state.styleId,
-        seed: state.seed,
-        params: state.params,
-        width: size.width,
-        height: size.height,
-        scale,
-        format,
-        ...(state.paletteId !== AUTO_PALETTE ? { paletteId: state.paletteId } : {}),
-      }
-      const out = await runExport(req, setPhase)
+      const out = await runExport(
+        {
+          styleId: state.styleId,
+          seed: state.seed,
+          params: state.params,
+          width: size.width,
+          height: size.height,
+          scale: effectiveScale,
+          format,
+          ...(state.paletteId !== AUTO_PALETTE ? { paletteId: state.paletteId } : {}),
+        },
+        setPhase,
+      )
       downloadBlob(out.blob, out.filename)
       setPhase('done')
-      window.setTimeout(() => setPhase('idle'), 2500)
+      window.clearTimeout(doneTimer.current)
+      doneTimer.current = window.setTimeout(() => setPhase('idle'), 2500)
     } catch (e) {
       setPhase('error')
       setError(e instanceof Error ? e.message : 'Export failed.')
     }
-  }
-
-  const phaseLabel: Record<ExportPhase, string> = {
-    idle: '',
-    composing: 'Rendering at full size…',
-    rasterizing: 'Rasterising…',
-    encoding: 'Encoding…',
-    done: 'Saved',
-    error: 'Failed',
   }
 
   return (
@@ -173,9 +186,20 @@ export function ExportDialog({ open, onClose }: { open: boolean; onClose: () => 
       onCancel={onClose}
       aria-labelledby="export-title"
     >
+      {/* Contents exist only while the dialog is open. Left mounted, the three
+          ratio previews recompose on every seed, style and parameter change
+          behind a dialog nobody is looking at, putting three extra
+          compositions on the path of every slider move. */}
+      {!open ? null : (
+      <>
       <div className="export__head">
         <h2 id="export-title">Export wallpaper</h2>
-        <button type="button" className="export__close" onClick={onClose} aria-label="Close export dialog">
+        <button
+          type="button"
+          className="export__close"
+          onClick={onClose}
+          aria-label="Close export dialog"
+        >
           &times;
         </button>
       </div>
@@ -188,7 +212,7 @@ export function ExportDialog({ open, onClose }: { open: boolean; onClose: () => 
               styleId={state.styleId}
               seed={state.seed}
               paletteId={state.paletteId}
-              params={state.params}
+              params={previewParams}
               width={r.width}
               height={r.height}
               label={r.label}
@@ -209,7 +233,9 @@ export function ExportDialog({ open, onClose }: { open: boolean; onClose: () => 
 
         <div className="export__fields">
           <div className="control">
-            <label className="control__head" htmlFor="export-size"><span>Size</span></label>
+            <label className="control__head" htmlFor="export-size">
+              <span>Size</span>
+            </label>
             <select
               id="export-size"
               value={size.custom ? 'custom' : size.id}
@@ -223,7 +249,7 @@ export function ExportDialog({ open, onClose }: { open: boolean; onClose: () => 
                 <optgroup key={group} label={group}>
                   {items.map((p) => (
                     <option key={p.id} value={p.id}>
-                      {p.label} — {p.width}×{p.height}
+                      {p.label} · {p.width}×{p.height}
                     </option>
                   ))}
                 </optgroup>
@@ -234,40 +260,56 @@ export function ExportDialog({ open, onClose }: { open: boolean; onClose: () => 
 
           {size.custom ? (
             <div className="export__custom-group">
-            <div className="export__custom">
-              <div className="control">
-                <label className="control__head" htmlFor="export-w"><span>Width</span></label>
-                <input
-                  id="export-w" type="number" min={16} max={16384} value={custom.width}
-                  onChange={(e) => commitCustom(Number(e.currentTarget.value) || 0, custom.height)}
-                />
+              <div className="export__custom">
+                <div className="control">
+                  <label className="control__head" htmlFor="export-w">
+                    <span>Width</span>
+                  </label>
+                  <input
+                    id="export-w"
+                    type="number"
+                    min={MIN_EDGE}
+                    max={MAX_EDGE}
+                    value={custom.width}
+                    onChange={(e) => commitCustom(Number(e.currentTarget.value) || 0, custom.height)}
+                  />
+                </div>
+                <div className="control">
+                  <label className="control__head" htmlFor="export-h">
+                    <span>Height</span>
+                  </label>
+                  <input
+                    id="export-h"
+                    type="number"
+                    min={MIN_EDGE}
+                    max={MAX_EDGE}
+                    value={custom.height}
+                    onChange={(e) => commitCustom(custom.width, Number(e.currentTarget.value) || 0)}
+                  />
+                </div>
               </div>
-              <div className="control">
-                <label className="control__head" htmlFor="export-h"><span>Height</span></label>
-                <input
-                  id="export-h" type="number" min={16} max={16384} value={custom.height}
-                  onChange={(e) => commitCustom(custom.width, Number(e.currentTarget.value) || 0)}
-                />
-              </div>
-            </div>
-            {customError ? <p className="export__dims is-bad">{customError}</p> : null}
+              {customError ? <p className="export__dims is-bad">{customError}</p> : null}
             </div>
           ) : null}
 
           <div className="control">
-            <span className="control__head"><span>Format</span></span>
-            <div className="chips" role="radiogroup" aria-label="File format">
+            <span className="control__head">
+              <span id="export-format-label">Format</span>
+            </span>
+            {/* real radios, so arrow keys and screen readers work without help */}
+            <div className="chips" role="radiogroup" aria-labelledby="export-format-label">
               {FORMATS.map((fmt) => (
-                <button
-                  key={fmt.id}
-                  type="button"
-                  role="radio"
-                  aria-checked={format === fmt.id}
-                  className={`chip${format === fmt.id ? ' is-active' : ''}`}
-                  onClick={() => setFormat(fmt.id)}
-                >
-                  {fmt.label}
-                </button>
+                <label key={fmt.id} className={`chip${format === fmt.id ? ' is-active' : ''}`}>
+                  <input
+                    className="visually-hidden"
+                    type="radio"
+                    name="export-format"
+                    value={fmt.id}
+                    checked={format === fmt.id}
+                    onChange={() => setFormat(fmt.id)}
+                  />
+                  <span>{fmt.label}</span>
+                </label>
               ))}
             </div>
           </div>
@@ -275,16 +317,23 @@ export function ExportDialog({ open, onClose }: { open: boolean; onClose: () => 
           <div className="control">
             <label className="control__head" htmlFor="export-scale">
               <span>Scale</span>
-              <output htmlFor="export-scale">{scale.toFixed(1)}×</output>
+              <output htmlFor="export-scale">{effectiveScale.toFixed(1)}×</output>
             </label>
             <input
-              id="export-scale" type="range" min={1} max={4} step={0.5} value={scale}
+              id="export-scale"
+              type="range"
+              min={1}
+              max={4}
+              step={0.5}
+              value={scale}
               disabled={format === 'svg'}
               onChange={(e) => setScale(Number(e.currentTarget.value))}
             />
             <p className={`export__dims${check.ok ? '' : ' is-bad'}`}>
               {format === 'svg' ? (
-                <>Vector — {size.width}&times;{size.height} viewBox, scales to any size</>
+                <>
+                  Vector · {size.width}&times;{size.height} viewBox, scales to any size
+                </>
               ) : (
                 <>
                   {check.width}&times;{check.height} px · {(check.pixels / 1e6).toFixed(1)} MP
@@ -298,23 +347,35 @@ export function ExportDialog({ open, onClose }: { open: boolean; onClose: () => 
 
       <div className="export__foot">
         <p className="export__file">
-          {filenameFor({ styleId: state.styleId, seed: state.seed, format }, check.width, check.height)}
+          {filenameFor(
+            { styleId: state.styleId, seed: state.seed, format },
+            check.width,
+            check.height,
+          )}
         </p>
         <div className="export__actions">
-          <span className={`export__phase${phase === 'error' ? ' is-bad' : ''}`} role="status">
-            {error ?? phaseLabel[phase]}
+          <span
+            className={`export__phase${phase === 'error' ? ' is-bad' : ''}`}
+            role="status"
+            aria-live="polite"
+          >
+            {error ?? PHASE_LABEL[phase]}
           </span>
-          <button type="button" className="btn" onClick={onClose}>Cancel</button>
+          <button type="button" className="btn" onClick={onClose}>
+            Cancel
+          </button>
           <button
             type="button"
             className="btn btn--primary"
             onClick={() => void onExport()}
-            disabled={busy || (!check.ok && format !== 'svg')}
+            disabled={busy || !check.ok}
           >
             {busy ? 'Working…' : `Download ${rendererOr(state.styleId).name}`}
           </button>
         </div>
       </div>
+      </>
+      )}
     </dialog>
   )
 }

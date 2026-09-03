@@ -1,4 +1,5 @@
 import { el, f, lerp } from '../../svg'
+import { capCell } from '../../sampling'
 import { withAlpha } from '../../palette'
 import type { ParamSchema, RenderContext, Renderer, Scene } from '../../types'
 
@@ -31,7 +32,7 @@ function render(ctx: RenderContext): Scene {
   const subject: string[] = []
   const front: string[] = []
 
-  const cell = u(lerp(78, 20, cellK))
+  const cell = capCell(ctx, u(lerp(78, 20, cellK)), 1600)
   const cols = Math.ceil(w / cell) + 2
   const rows = Math.ceil(h / cell) + 2
   const thread = cell * 0.3

@@ -50,13 +50,16 @@ function render(ctx: RenderContext): Scene {
     return s / sources.length
   }
 
-  const samples = Math.max(40, Math.round(96 * Math.max(0.4, ctx.quality ** 0.5)))
+  // Samples multiply by rings and again by sources, so this is the single
+  // biggest lever on document size in this family. Ninety-six put the source
+  // past a megabyte and a half; the extra smoothness was not visible.
+  const samples = Math.max(28, Math.round(52 * Math.max(0.4, ctx.quality ** 0.5)))
   const reach = Math.hypot(w, h) * 0.72
   let accent: string | undefined
   let accentScore = Infinity
 
   sources.forEach((src, si) => {
-    const rings = Math.round(reach / wavelength)
+    const rings = Math.min(46, Math.round(reach / wavelength))
     for (let i = 1; i <= rings; i++) {
       if ((i & 15) === 0 && ctx.expired()) break
       const r0 = i * wavelength
