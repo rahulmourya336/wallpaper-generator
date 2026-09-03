@@ -1,6 +1,8 @@
 import { lerp } from '../../svg'
 import { path } from '../../scene/path'
 import type { Path } from '../../scene/path'
+import { archShape, cutShape, shape } from '../../scene/sdf'
+import type { SdfShape } from '../../scene/sdf'
 import { node } from '../../scene/types'
 import type { Node, SceneGraph } from '../../scene/types'
 import type { ParamSchema, RenderContext, Renderer } from '../../types'
@@ -103,6 +105,19 @@ function archPath(a: Arch): Path {
 }
 
 /**
+ * The same arch as a distance field.
+ *
+ * Built from the same set-out as the path, so the two agree by construction
+ * rather than by being kept in step by hand. The GPU path draws this one; the
+ * CPU and vector backends draw the path. A family that emits both can move to
+ * the GPU without any of its fallbacks noticing.
+ */
+function archSdf(a: Arch): SdfShape {
+  const s = setOut(a)
+  return archShape(a.cx, a.base, s.half, a.h, a.head === 'horseshoe' ? 0.52 : a.head === 'segmental' ? 0.76 : 0.62, s.hrx, s.hry, a.flip)
+}
+
+/**
  * Half-width of the arch at a given height.
  *
  * Coursing needs to stop at the arch face. Trimming the lines analytically is
@@ -138,6 +153,19 @@ function build(ctx: RenderContext): SceneGraph {
 
   const nodes: Node[] = []
   const reach = Math.max(focal.rx, focal.ry)
+
+  /**
+   * A minimum width for anything drawn as a line.
+   *
+   * Canvas quietly rescues a sub-pixel stroke — it antialiases something
+   * visible however thin the line is asked to be. An exact distance field does
+   * not: a capsule with a radius of a fifth of a pixel covers a fifth of a
+   * pixel and the coursing simply disappears from a thumbnail. The field is
+   * right and the canvas was wrong, but the picture still needs the line, so
+   * the floor is stated here where it belongs. A real pen has a minimum width
+   * and does not vanish when you shrink the paper.
+   */
+  const hairline = (units: number) => Math.max(units * 0.5, ctx.n(0.42))
 
   // --- the arrangement ------------------------------------------------------
   const PLANS = ['row', 'nest', 'stack', 'mirror', 'scatter'] as const
@@ -269,13 +297,15 @@ function build(ctx: RenderContext): SceneGraph {
   // --- the ground -----------------------------------------------------------
   nodes.push(node(
     {
-      k: 'poly',
-      pts: Float64Array.from([-w, ground, w * 2, ground, w * 2, h + reach, -w, h + reach]),
-      closed: true,
+      k: 'sdf',
+      shape: shape([{ k: 'box', cx: w / 2, cy: ground + h, hw: w * 2, hh: h, r: 0 }]),
+      path: path()
+        .polyline([-w, ground, w * 2, ground, w * 2, h + reach, -w, h + reach], true)
+        .build(),
     },
     0.03,
     { k: 'matte', edgeDark: 0 },
-    0.16,
+    0.34,
     { mask: 'outside', light: { receives: true, casts: false, emissive: 0 }, seedRef: 1 },
   ))
 
@@ -283,7 +313,7 @@ function build(ctx: RenderContext): SceneGraph {
   arches.forEach((a, i) => {
     if (ctx.expired()) return
     const open = i === openIdx
-    const geom = { k: 'path' as const, path: archPath(a) }
+    const geom = { k: 'sdf' as const, shape: archSdf(a), path: archPath(a) }
 
     nodes.push(node(
       geom,
@@ -303,8 +333,16 @@ function build(ctx: RenderContext): SceneGraph {
       for (let k = 1; k <= rings; k++) {
         const inner = shrink(a, (a.w * 0.42 * k) / rings)
         if (inner.w < 6) break
+        // A ring is the arch minus its own inset copy. The inner arch has to be
+        // removed as one shape, not as its three parts in sequence, or its own
+        // trim box is subtracted on its own and takes a rectangle out of the
+        // ring with it.
+        const ring = cutShape(
+          archSdf(inner),
+          archSdf(shrink(inner, Math.max(hairline(1.4 * weightK) * 2, a.w * 0.014 * weightK))),
+        )
         nodes.push(node(
-          { k: 'path', path: archPath(inner) },
+          { k: 'sdf', shape: ring, path: archPath(inner) },
           a.plane + 0.004,
           { k: 'ink', bleed: 0.3, pressure: 0.35 },
           a.tone > 0.5 ? 0.1 : 0.95,
@@ -324,14 +362,23 @@ function build(ctx: RenderContext): SceneGraph {
       for (let k = 1; k < courses; k++) {
         const y = a.base - a.flip * a.h * (k / courses)
         const hw = halfAt(a, y)
-        if (hw < 1) continue
+        // A capsule's round caps extend a full radius past its endpoints, so a
+        // joint drawn to the arch face pokes out through it. The stroked path
+        // did not, because a stroke ends where its path ends. Pull the ends
+        // back by the radius, and drop joints too short to survive it.
+        const r = hairline(1.1 * weightK)
+        if (hw <= r * 1.2) continue
         nodes.push(node(
-          { k: 'poly', pts: Float64Array.from([a.cx - hw, y, a.cx + hw, y]), closed: false },
+          {
+            k: 'sdf',
+            shape: shape([{ k: 'capsule', x0: a.cx - hw + r, y0: y, x1: a.cx + hw - r, y1: y, r }]),
+            path: path().moveTo(a.cx - hw, y).lineTo(a.cx + hw, y).build(),
+          },
           a.plane + 0.006,
           { k: 'ink', bleed: 0.5, pressure: 0.2 },
           a.tone > 0.55 ? 0.06 : 0.7,
           {
-            weight: 1.1 * weightK, stroke: true, alpha: 0.34 + 0.3 * coursesK,
+            weight: 1.1 * weightK, stroke: true, alpha: 0.16 + 0.2 * coursesK,
             seedRef: i * 64 + k,
             light: { receives: false, casts: false, emissive: 0 },
           },
@@ -343,10 +390,14 @@ function build(ctx: RenderContext): SceneGraph {
   // the datum the whole arrangement was set out from
   const springY = ground - (arches[0]?.h ?? reach) * 0.62
   nodes.push(node(
-    { k: 'poly', pts: Float64Array.from([-w * 0.1, springY, w * 1.1, springY]), closed: false },
-    0.97,
+    {
+      k: 'sdf',
+      shape: shape([{ k: 'capsule', x0: -w * 0.1, y0: springY, x1: w * 1.1, y1: springY, r: hairline(1.2 * weightK) }]),
+      path: path().moveTo(-w * 0.1, springY).lineTo(w * 1.1, springY).build(),
+    },
+    0.72,
     { k: 'ink', bleed: 0.2, pressure: 0.15 },
-    0.9,
+    0.55,
     {
       weight: 1.2 * weightK, stroke: true, alpha: 0.5, seedRef: 7,
       light: { receives: false, casts: false, emissive: 0 },

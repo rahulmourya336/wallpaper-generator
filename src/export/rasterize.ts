@@ -22,7 +22,7 @@ export const FORMATS: ReadonlyArray<{
 }> = [
   { id: 'jpeg', label: 'JPEG', ext: 'jpg', mime: 'image/jpeg', note: 'Best for sharing. Small file.' },
   { id: 'png', label: 'PNG', ext: 'png', mime: 'image/png', note: 'Lossless. Very large at high scale.' },
-  { id: 'svg', label: 'SVG', ext: 'svg', mime: 'image/svg+xml', note: 'Vector. Scales to any size.' },
+  { id: 'svg', label: 'SVG', ext: 'svg', mime: 'image/svg+xml', note: 'Vector. Scales to any size. Approximate for lit styles.' },
 ]
 
 export const JPEG_QUALITY = 0.92

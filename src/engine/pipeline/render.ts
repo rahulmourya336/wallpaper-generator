@@ -91,6 +91,8 @@ function jitter(p: Path, seedRef: number, amount: number, seed: string): Path {
 
 function geomToPath2D(g: Geom, ctx: RenderContext, n: Node, hand: number): Path2D {
   switch (g.k) {
+    case 'sdf':
+      return g.path ? toPath2D(jitter(g.path, n.seedRef, hand, ctx.seed)) : new Path2D()
     case 'path':
       return toPath2D(jitter(g.path, n.seedRef, hand, ctx.seed))
     case 'ellipse': {
@@ -121,6 +123,7 @@ function geomToPath2D(g: Geom, ctx: RenderContext, n: Node, hand: number): Path2
 
 function geomBounds(g: Geom): { x0: number; y0: number; x1: number; y1: number } {
   switch (g.k) {
+    case 'sdf': return g.path ? bounds(g.path) : { x0: 0, y0: 0, x1: 0, y1: 0 }
     case 'path': return bounds(g.path)
     case 'ellipse': return { x0: g.cx - g.rx, y0: g.cy - g.ry, x1: g.cx + g.rx, y1: g.cy + g.ry }
     default: {
@@ -243,8 +246,9 @@ function applyMaterial(c: Ctx2D, ctx: RenderContext, n: Node, p2: Path2D, hand: 
       c.strokeStyle = ctx.ramp(Math.max(0, Math.min(1, n.tone * (0.78 + 0.22 * n.plane))))
       c.lineCap = 'round'
       c.lineJoin = 'round'
-      const runs = n.geom.k === 'path'
-        ? flatten(jitter(n.geom.path, n.seedRef, hand, ctx.seed), 10)
+      const inkPath = n.geom.k === 'path' ? n.geom.path : n.geom.k === 'sdf' ? n.geom.path : undefined
+      const runs = inkPath
+        ? flatten(jitter(inkPath, n.seedRef, hand, ctx.seed), 10)
         : n.geom.k === 'poly'
           ? [Array.from(n.geom.pts)]
           : []
@@ -569,10 +573,11 @@ export function canRaster(): boolean {
 export function countPrimitives(graph: SceneGraph): number {
   let n = 0
   for (const node of graph.nodes) {
+    const pathOf = node.geom.k === 'path' ? node.geom.path : node.geom.k === 'sdf' ? node.geom.path : undefined
     if (node.geom.k === 'points') n += node.geom.r.length
-    else if (node.geom.k === 'path') {
+    else if (pathOf) {
       let cmds = 0
-      walk(node.geom.path, (op) => { if (op !== OP.close) cmds++ })
+      walk(pathOf, (op) => { if (op !== OP.close) cmds++ })
       n += Math.max(1, Math.ceil(cmds / 4))
     } else n += 1
   }

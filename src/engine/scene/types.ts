@@ -1,4 +1,5 @@
 import type { Path } from './path'
+import type { SdfShape } from './sdf'
 
 /**
  * The scene graph.
@@ -22,6 +23,17 @@ import type { Path } from './path'
  */
 
 export type Geom =
+  /**
+   * A distance field, which is the only kind the GPU path can draw.
+   *
+   * It carries strictly more than an outline: how far every point in the plane
+   * is from the form, not just where its edge is. Occlusion, soft shadow,
+   * thickness and antialiasing all fall out of that, and none of them are
+   * available from a path. A family emits this when its forms are analytic
+   * enough to express as primitives, and keeps a path alongside for the CPU
+   * and vector backends.
+   */
+  | { k: 'sdf'; shape: SdfShape; path?: Path }
   | { k: 'path'; path: Path }
   | { k: 'ellipse'; cx: number; cy: number; rx: number; ry: number; rot: number }
   | { k: 'poly'; pts: Float64Array; closed: boolean }

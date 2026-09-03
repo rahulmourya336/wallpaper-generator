@@ -9,6 +9,8 @@ import { atmosphere, bloomed, groundFill, lightDefs, sheen } from './light'
 import { attrs, circlePath, clamp, el, f, group, lerp } from './svg'
 import { resolveToScene } from './scene/svg-backend'
 import { canRaster, countPrimitives, renderGraph } from './pipeline/render'
+import { graphIsGpuReady, renderGpu } from './gpu/render'
+import { gpuEnabled } from './gpu/flag'
 import type {
   Dimensions, Focal, FocalKind, ParamSchema, ParamValues, RenderContext, Renderer, Scene,
 } from './types'
@@ -44,6 +46,8 @@ export type ComposeResult = {
    * must show the raster and keep the vector for SVG download only.
    */
   raster: boolean
+  /** which path actually drew it; shown in the export dialog and dev overlay */
+  backend: 'gpu' | 'cpu' | 'vector'
 }
 
 /** Fill in defaults, clamp ranges, reject unknown select options. */
@@ -293,11 +297,33 @@ export function compose(input: ComposeInput): ComposeResult {
   const result: ComposeResult = {
     svg, inner, width: w, height: h, palette, layout: plan.id, truncated,
     raster: useRaster,
+    backend: 'vector',
   }
+
+  /**
+   * Three backends, in descending order of what they can do.
+   *
+   * The GPU path needs a graph whose every node carries a distance field, a
+   * WebGL2 context with float render targets, and the flag left on. Any one of
+   * those missing falls through to the CPU pipeline, and no canvas at all
+   * falls through to the vector approximation. Each fallback is a real
+   * picture, which is what makes it safe to depend on them: the floor stays a
+   * correct composition, only a less lit one.
+   */
   if (useRaster && graph) {
+    if (gpuEnabled() && graphIsGpuReady(graph)) {
+      const painter = renderGpu({ ctx, graph, plan, character, quality })
+      if (painter) {
+        result.paint = painter
+        result.backend = 'gpu'
+        return result
+      }
+    }
     result.paint = renderGraph({ ctx, graph, plan, character, quality })
+    result.backend = 'cpu'
   } else if (scene.paint) {
     result.paint = (c: CanvasRenderingContext2D) => scene.paint?.(c, ctx)
+    result.backend = 'cpu'
   }
   return result
 }

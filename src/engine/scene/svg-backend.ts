@@ -48,6 +48,10 @@ function planeAlpha(plane: number): number {
 
 export function geomToD(geom: Geom): string {
   switch (geom.k) {
+    // An SDF node carries a path too, precisely so the vector and CPU
+    // backends keep working unchanged when a family moves to the GPU.
+    case 'sdf':
+      return geom.path ? toD(geom.path) : ''
     case 'path':
       return toD(geom.path)
     case 'ellipse': {
@@ -79,7 +83,8 @@ export function geomToD(geom: Geom): string {
 }
 
 function nodePath(geom: Geom): Path | null {
-  return geom.k === 'path' ? geom.path : null
+  if (geom.k === 'path') return geom.path
+  return geom.k === 'sdf' ? geom.path ?? null : null
 }
 
 /** Shared gradients, one small set per composition rather than per node. */
