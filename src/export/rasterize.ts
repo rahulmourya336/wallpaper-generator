@@ -179,7 +179,10 @@ export async function runExport(
     }
     const painted = paintToCanvas(result)
     if (painted) c.drawImage(painted, 0, 0, size.width, size.height)
-    c.drawImage(img, 0, 0, size.width, size.height)
+    // For a scene-graph family the painted buffer is the finished image and
+    // the SVG is only its vector approximation; drawing both would put an
+    // ungraded, unfilmed copy on top of the graded one.
+    if (!result.raster) c.drawImage(img, 0, 0, size.width, size.height)
 
     onPhase?.('encoding')
     await yieldToPaint()

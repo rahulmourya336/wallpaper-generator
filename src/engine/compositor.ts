@@ -8,6 +8,7 @@ import type { LayoutId, LayoutPlan } from './layout'
 import { atmosphere, bloomed, groundFill, lightDefs, sheen } from './light'
 import { attrs, circlePath, clamp, el, f, group, lerp } from './svg'
 import { resolveToScene } from './scene/svg-backend'
+import { canRaster, countPrimitives, renderGraph } from './pipeline/render'
 import type {
   Dimensions, Focal, FocalKind, ParamSchema, ParamValues, RenderContext, Renderer, Scene,
 } from './types'
@@ -35,6 +36,14 @@ export type ComposeResult = {
   paint?: (c: CanvasRenderingContext2D) => void
   /** true if a renderer bailed out of a growth loop on the time budget */
   truncated: boolean
+  /**
+   * `paint` is the complete image and `svg` is a vector approximation of it.
+   *
+   * Set for families on the scene graph, whose film pass — ordered dithering,
+   * chroma-aware grain, a perceptual grade — has no SVG expression. Consumers
+   * must show the raster and keep the vector for SVG download only.
+   */
+  raster: boolean
 }
 
 /** Fill in defaults, clamp ranges, reject unknown select options. */
@@ -231,9 +240,14 @@ export function compose(input: ComposeInput): ComposeResult {
    * is what lets the catalogue migrate a family at a time instead of in one
    * jump.
    */
-  const scene: Scene = renderer.build
-    ? resolveToScene(ctx, renderer.build(ctx))
-    : renderer.render(ctx)
+  const graph = renderer.build ? renderer.build(ctx) : null
+  const scene: Scene = graph ? resolveToScene(ctx, graph) : (renderer.render as (c: RenderContext) => Scene)(ctx)
+
+  if (import.meta.env.DEV && graph) {
+    const prims = countPrimitives(graph)
+    if (prims < 400) console.warn(`[budget] ${renderer.id} emitted ${prims} primitives (under 400)`)
+    if (prims > 6000) console.warn(`[budget] ${renderer.id} emitted ${prims} primitives (over 6000)`)
+  }
 
   if (import.meta.env.DEV && !scene.accent && renderer.mode !== 'canvas') {
     console.warn(`[compositor] ${renderer.id} produced no accent element`)
@@ -267,10 +281,24 @@ export function compose(input: ComposeInput): ComposeResult {
     }) +
     `>${inner}</svg>`
 
+  /**
+   * A graph family renders through the post pipeline when a canvas is
+   * available, and falls back to its own vector approximation when one is not
+   * — which is the case in the headless sweeps and will be the case in CI.
+   * The fallback is a real picture, not a placeholder, which is what makes it
+   * safe to depend on.
+   */
+  const useRaster = graph !== null && canRaster()
+
   const result: ComposeResult = {
     svg, inner, width: w, height: h, palette, layout: plan.id, truncated,
+    raster: useRaster,
   }
-  if (scene.paint) result.paint = (c: CanvasRenderingContext2D) => scene.paint?.(c, ctx)
+  if (useRaster && graph) {
+    result.paint = renderGraph({ ctx, graph, plan, character, quality })
+  } else if (scene.paint) {
+    result.paint = (c: CanvasRenderingContext2D) => scene.paint?.(c, ctx)
+  }
   return result
 }
 

@@ -4,7 +4,9 @@ import type { ComposeResult } from '../engine/compositor'
 /**
  * Paints one composition into whatever positioned box the parent provides.
  *
- * Canvas families paint a raster layer that the SVG then sits on top of, so
+ * A family on the scene graph paints the whole image into the canvas and its
+ * SVG is only a fallback for the vector download, so the overlay is suppressed
+ * for those; the older canvas families paint a layer the SVG sits on top of, so
  * every place that shows a composition needs the same three things: a canvas,
  * an effect that repaints it when the result changes, and the SVG overlay.
  * Keeping that in one component is what stops the main canvas, the filmstrip
@@ -43,6 +45,7 @@ export function CompositionView({
           aria-hidden="true"
         />
       ) : null}
+      {result.raster ? null : (
       <svg
         className="composition__svg"
         xmlns="http://www.w3.org/2000/svg"
@@ -51,6 +54,7 @@ export function CompositionView({
         {...(label ? { role: 'img', 'aria-label': label } : { 'aria-hidden': true })}
         dangerouslySetInnerHTML={{ __html: result.inner }}
       />
+      )}
     </>
   )
 }

@@ -238,7 +238,7 @@ function build(ctx: RenderContext): SceneGraph {
    * downstream of it, and none of them appear anywhere in this file.
    */
   const widest = arches.reduce((m, a) => Math.max(m, a.w), 1)
-  for (const a of arches) a.plane = 0.16 + 0.72 * (a.w / widest) ** 0.8
+  for (const a of arches) a.plane = 0.16 + 0.66 * (a.w / widest) ** 0.8
 
   // --- the aperture ---------------------------------------------------------
   // Whichever arch is nearest the subject is cut open instead of filled. On a
@@ -253,6 +253,18 @@ function build(ctx: RenderContext): SceneGraph {
       if (d < best) { best = d; openIdx = i }
     })
   }
+
+  /**
+   * The aperture is the subject, so it is near.
+   *
+   * Size alone would put it wherever its width fell, and on a nest that is the
+   * smallest arch in the frame — which sends the depth of field to focus on
+   * the far plane and blurs the one thing the composition is about. What the
+   * viewer is looking at is a fact about the composition, not a consequence of
+   * geometry, so the renderer states it.
+   */
+  const opening = arches[openIdx]
+  if (opening) opening.plane = 0.88
 
   // --- the ground -----------------------------------------------------------
   nodes.push(node(
@@ -276,8 +288,8 @@ function build(ctx: RenderContext): SceneGraph {
     nodes.push(node(
       geom,
       a.plane,
-      open ? { k: 'emissive', intensity: 0.85 } : { k: 'mass', facing: 0.5 + 0.5 * shadowK },
-      open ? 0.95 : a.tone,
+      open ? { k: 'emissive', intensity: 0.45 } : { k: 'mass', facing: 0.5 + 0.5 * shadowK },
+      open ? 0.82 : a.tone,
       {
         seedRef: i + 2,
         light: { receives: !open, casts: !open, emissive: open ? 1 : 0 },
@@ -297,7 +309,7 @@ function build(ctx: RenderContext): SceneGraph {
           { k: 'ink', bleed: 0.3, pressure: 0.35 },
           a.tone > 0.5 ? 0.1 : 0.95,
           {
-            weight: 1.4 * weightK, stroke: true, alpha: 0.24,
+            weight: 1.4 * weightK, stroke: true, alpha: 0.5,
             seedRef: i * 32 + k,
             light: { receives: false, casts: false, emissive: 0 },
           },
@@ -319,7 +331,7 @@ function build(ctx: RenderContext): SceneGraph {
           { k: 'ink', bleed: 0.5, pressure: 0.2 },
           a.tone > 0.55 ? 0.06 : 0.7,
           {
-            weight: 1.1 * weightK, stroke: true, alpha: 0.16 + 0.2 * coursesK,
+            weight: 1.1 * weightK, stroke: true, alpha: 0.34 + 0.3 * coursesK,
             seedRef: i * 64 + k,
             light: { receives: false, casts: false, emissive: 0 },
           },
@@ -336,7 +348,7 @@ function build(ctx: RenderContext): SceneGraph {
     { k: 'ink', bleed: 0.2, pressure: 0.15 },
     0.9,
     {
-      weight: 1.2 * weightK, stroke: true, alpha: 0.28, seedRef: 7,
+      weight: 1.2 * weightK, stroke: true, alpha: 0.5, seedRef: 7,
       light: { receives: false, casts: false, emissive: 0 },
     },
   ))

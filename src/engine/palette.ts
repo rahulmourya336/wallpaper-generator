@@ -1,3 +1,4 @@
+import { mixLab } from './oklab'
 /**
  * Palettes carry most of what a wallpaper feels like.
  *
@@ -171,23 +172,18 @@ export function hexToRgb(hex: string): Rgb {
   return { r: (n >> 16) & 255, g: (n >> 8) & 255, b: n & 255 }
 }
 
-const toLinear = (c: number) => {
-  const s = c / 255
-  return s <= 0.04045 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4
-}
-const toSrgb = (l: number) => {
-  const s = l <= 0.0031308 ? l * 12.92 : 1.055 * l ** (1 / 2.4) - 0.055
-  return Math.round(Math.max(0, Math.min(1, s)) * 255)
-}
-
-const hex2 = (n: number) => n.toString(16).padStart(2, '0')
-
-/** Gamma-correct mix. sRGB lerping muddies mid-ramp values into grey. */
+/**
+ * Mix two colours perceptually.
+ *
+ * This was a gamma-correct sRGB mix, which is already better than the naive
+ * one and still wrong in the way that matters: sRGB is a display encoding, so
+ * a straight line through it desaturates through the middle. Every ramp in the
+ * app is stops interpolated between, so that dip was showing up in the
+ * mid-tones of all thirty compositions at once. OKLab is a straight line
+ * through something the eye agrees with.
+ */
 export function mixHex(a: string, b: string, t: number): string {
-  const x = hexToRgb(a)
-  const y = hexToRgb(b)
-  const m = (p: number, q: number) => toSrgb(toLinear(p) + (toLinear(q) - toLinear(p)) * t)
-  return `#${hex2(m(x.r, y.r))}${hex2(m(x.g, y.g))}${hex2(m(x.b, y.b))}`
+  return mixLab(a, b, t)
 }
 
 /** Sample the five-stop ramp continuously. t is clamped to [0, 1]. */
