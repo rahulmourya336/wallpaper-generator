@@ -35,6 +35,14 @@ export function useElementSize<T extends HTMLElement>(): [
     [measure],
   )
 
+  // Re-measure after every commit, not just on mount. The guard inside measure
+  // means an unchanged box sets no state, so this cannot loop — and it keeps
+  // the size correct when a sibling's layout changes without the observer
+  // having had a rendering opportunity to deliver.
+  useLayoutEffect(() => {
+    measure(nodeRef.current)
+  })
+
   useLayoutEffect(() => {
     const node = nodeRef.current
     if (!node) return

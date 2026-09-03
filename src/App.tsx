@@ -1,5 +1,6 @@
 import { Canvas } from './ui/Canvas'
 import { ControlRail } from './ui/ControlRail'
+import { Filmstrip } from './ui/Filmstrip'
 import { StagePills } from './ui/StagePills'
 
 export function App(): React.JSX.Element {
@@ -14,8 +15,11 @@ export function App(): React.JSX.Element {
 
       <main className="studio">
         <section className="stage" aria-label="Wallpaper preview">
-          <Canvas />
-          <StagePills />
+          <div className="stage__canvas">
+            <Canvas />
+            <StagePills />
+          </div>
+          <Filmstrip />
         </section>
         <ControlRail />
       </main>
