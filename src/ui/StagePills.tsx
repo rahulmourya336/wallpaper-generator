@@ -33,8 +33,8 @@ function ExportIcon(): React.JSX.Element {
 export function StagePills({ onExport }: { onExport: () => void }): React.JSX.Element {
   const state = useStudio()
   const lockLabel = state.seedLocked
-    ? 'Seed locked. Shuffle will re-roll the parameters. Click to unlock.'
-    : 'Seed unlocked. Shuffle will pick a new seed. Click to lock.'
+    ? 'Style locked. Shuffle re-rolls the settings only. Click to unlock.'
+    : 'Style unlocked. Shuffle picks a new style. Click to lock this one.'
 
   return (
     <div className="pill pill--actions">
@@ -42,10 +42,10 @@ export function StagePills({ onExport }: { onExport: () => void }): React.JSX.El
           type="button"
           className="pill__btn pill__btn--primary"
           onClick={() => actions.shuffle()}
-          title={state.seedLocked ? 'Shuffle parameters' : 'Shuffle seed'}
+          title={state.seedLocked ? 'Shuffle the settings' : 'Shuffle style and design'}
         >
           <ShuffleIcon />
-          <span>{state.seedLocked ? 'Shuffle params' : 'Shuffle'}</span>
+          <span>{state.seedLocked ? 'Reshuffle' : 'Shuffle'}</span>
         </button>
         <button
           type="button"

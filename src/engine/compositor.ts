@@ -5,6 +5,7 @@ import type { Palette } from './palette'
 import { characterOf } from './character'
 import { fieldTransform, pickLayout, planLayout } from './layout'
 import type { LayoutId, LayoutPlan } from './layout'
+import { atmosphere, bloomed, groundFill, lightDefs, sheen } from './light'
 import { attrs, circlePath, clamp, el, f, group, lerp } from './svg'
 import type {
   Dimensions, Focal, FocalKind, ParamSchema, ParamValues, RenderContext, Renderer, Scene,
@@ -297,6 +298,7 @@ function assemble(
     el('pattern',
       { id: `${uid}-grain`, patternUnits: 'userSpaceOnUse', width: GRAIN_TILE, height: GRAIN_TILE },
       el('rect', { width: GRAIN_TILE, height: GRAIN_TILE, filter: `url(#${uid}-gf)` })),
+    ...lightDefs(ctx, uid, character),
     ...(scene.defs ?? []),
   ]
 
@@ -314,7 +316,9 @@ function assemble(
     const off = ctx.u(2.6)
     for (const foc of focals) {
       field.push(
-        el('path', { d: foc.path, fill: mixHex(p.ground, p.ramp[0], character.formFill) }) +
+        // the subject sits above the field, so it casts onto it
+        el('g', { filter: `url(#${uid}-cast)` },
+          el('path', { d: foc.path, fill: mixHex(p.ground, p.ramp[0], character.formFill) })) +
           el('path', {
             d: foc.path,
             fill: 'none',
@@ -333,21 +337,24 @@ function assemble(
   field.push(group({ fill: 'none' }, ghostGeometry(ctx)))
 
   // stage 7: elements crossing over the form edge
-  field.push(group({}, scene.front))
+  field.push(group({ filter: `url(#${uid}-lift)` }, scene.front))
 
   // stage 8: the single accent
-  if (scene.accent) field.push(scene.accent)
+  if (scene.accent) field.push(bloomed(scene.accent, uid, character))
 
   const transform = fieldTransform(plan, w, h)
   const layers: string[] = []
 
   // stage 1: ground, in screen space so the transform cannot expose bare edges
   if (renderer.mode !== 'canvas') {
-    layers.push(el('rect', { x: 0, y: 0, width: w, height: h, fill: p.ground }))
+    layers.push(groundFill(ctx, uid))
+    layers.push(atmosphere(ctx, uid, plan, character))
   }
   layers.push(transform ? el('g', { transform }, field.join('')) : field.join(''))
 
-  // stage 9 and 10: vignette and grain, screen space and never rotated
+  layers.push(sheen(ctx, uid, character))
+
+  // vignette and grain: screen space, never rotated
   layers.push(el('rect', { x: 0, y: 0, width: w, height: h, fill: `url(#${uid}-vig)` }))
   layers.push(el('rect', {
     x: 0, y: 0, width: w, height: h,

@@ -5,10 +5,24 @@ import { MAX_EXPORT_EDGE, MAX_EXPORT_PIXELS } from './presets'
 
 export type ExportFormat = 'png' | 'jpeg' | 'svg'
 
-export const FORMATS: ReadonlyArray<{ id: ExportFormat; label: string; ext: string; mime: string }> = [
-  { id: 'png', label: 'PNG', ext: 'png', mime: 'image/png' },
-  { id: 'jpeg', label: 'JPEG', ext: 'jpg', mime: 'image/jpeg' },
-  { id: 'svg', label: 'SVG', ext: 'svg', mime: 'image/svg+xml' },
+/**
+ * JPEG leads.
+ *
+ * Now that compositions carry gradients and bloom there is very little flat
+ * colour left for PNG to compress, and a 4x PNG lands near 80MB against under
+ * a megabyte for the same image as JPEG. Lossless is still available; it is
+ * just no longer the default nobody chose.
+ */
+export const FORMATS: ReadonlyArray<{
+  id: ExportFormat
+  label: string
+  ext: string
+  mime: string
+  note: string
+}> = [
+  { id: 'jpeg', label: 'JPEG', ext: 'jpg', mime: 'image/jpeg', note: 'Best for sharing. Small file.' },
+  { id: 'png', label: 'PNG', ext: 'png', mime: 'image/png', note: 'Lossless. Very large at high scale.' },
+  { id: 'svg', label: 'SVG', ext: 'svg', mime: 'image/svg+xml', note: 'Vector. Scales to any size.' },
 ]
 
 export const JPEG_QUALITY = 0.92

@@ -21,6 +21,12 @@ export type Character = {
   grain: number
   /** how much of the focal form the compositor fills in behind the field */
   formFill: number
+  /** blurred colour fields behind the artwork */
+  atmosphere: number
+  /** halo around the single accent */
+  bloom: number
+  /** broad specular sweep from the light direction */
+  sheen: number
 }
 
 const DEFAULT: Character = {
@@ -29,6 +35,9 @@ const DEFAULT: Character = {
   vignette: 1,
   grain: 1,
   formFill: 0.72,
+  atmosphere: 1,
+  bloom: 1,
+  sheen: 0.85,
 }
 
 export const CHARACTERS: Record<FamilyId, Character> = {
@@ -39,6 +48,9 @@ export const CHARACTERS: Record<FamilyId, Character> = {
     vignette: 1,
     grain: 1,
     formFill: 0.72,
+    atmosphere: 0.85,
+    bloom: 1,
+    sheen: 0.9,
   },
   // earthy and grown. wants a horizon and room above it.
   organic: {
@@ -47,6 +59,9 @@ export const CHARACTERS: Record<FamilyId, Character> = {
     vignette: 0.85,
     grain: 1.15,
     formFill: 0.62,
+    atmosphere: 0.9,
+    bloom: 0.85,
+    sheen: 0.8,
   },
   // loud, flat, printed. bright grounds and pairs of things.
   'retro-pop': {
@@ -55,6 +70,9 @@ export const CHARACTERS: Record<FamilyId, Character> = {
     vignette: 0.5,
     grain: 1.3,
     formFill: 0.82,
+    atmosphere: 0.7,
+    bloom: 1.2,
+    sheen: 0.5,
   },
   // deep and open. almost all sky.
   atmospheric: {
@@ -63,6 +81,9 @@ export const CHARACTERS: Record<FamilyId, Character> = {
     vignette: 1.0,
     grain: 0.85,
     formFill: 0.58,
+    atmosphere: 1.3,
+    bloom: 1.35,
+    sheen: 1.2,
   },
   // near monochrome with one signal colour. drawn on a slant.
   technical: {
@@ -71,6 +92,9 @@ export const CHARACTERS: Record<FamilyId, Character> = {
     vignette: 0.9,
     grain: 0.8,
     formFill: 0.58,
+    atmosphere: 0.6,
+    bloom: 1.35,
+    sheen: 0.7,
   },
   // the darkest family, and the only one that goes truly black-and-bright.
   cosmic: {
@@ -79,6 +103,9 @@ export const CHARACTERS: Record<FamilyId, Character> = {
     vignette: 1.05,
     grain: 0.9,
     formFill: 0.6,
+    atmosphere: 1.35,
+    bloom: 1.6,
+    sheen: 1,
   },
   // woven and even. no dramatic light, fills the frame edge to edge.
   textile: {
@@ -87,6 +114,9 @@ export const CHARACTERS: Record<FamilyId, Character> = {
     vignette: 0.4,
     grain: 1.25,
     formFill: 0.78,
+    atmosphere: 0.55,
+    bloom: 0.6,
+    sheen: 0.45,
   },
   // concrete and daylight. low horizons, subjects pushed to an edge.
   architectural: {
@@ -95,6 +125,9 @@ export const CHARACTERS: Record<FamilyId, Character> = {
     vignette: 0.95,
     grain: 1.05,
     formFill: 0.68,
+    atmosphere: 0.8,
+    bloom: 0.85,
+    sheen: 1.1,
   },
   // iridescent and wet. close in, or two pools at once.
   liquid: {
@@ -103,6 +136,9 @@ export const CHARACTERS: Record<FamilyId, Character> = {
     vignette: 0.95,
     grain: 0.9,
     formFill: 0.62,
+    atmosphere: 1.4,
+    bloom: 1.4,
+    sheen: 1.05,
   },
   // grown structures, packed. close, and often more than one colony.
   cellular: {
@@ -111,6 +147,9 @@ export const CHARACTERS: Record<FamilyId, Character> = {
     vignette: 0.9,
     grain: 1.1,
     formFill: 0.68,
+    atmosphere: 1,
+    bloom: 1,
+    sheen: 0.75,
   },
 }
 

@@ -103,7 +103,7 @@ export function ExportDialog({
   const doneTimer = useRef(0)
   const size = resolveSize(state.exportPreset)
 
-  const [format, setFormat] = useState<ExportFormat>('png')
+  const [format, setFormat] = useState<ExportFormat>('jpeg')
   const [scale, setScale] = useState(1)
   const [showSafeZones, setShowSafeZones] = useState(false)
   const [custom, setCustom] = useState({ width: size.width, height: size.height })
@@ -313,6 +313,7 @@ export function ExportDialog({
                 </label>
               ))}
             </div>
+            <p className="export__dims">{FORMATS.find((x) => x.id === format)?.note}</p>
           </div>
 
           <div className="field">

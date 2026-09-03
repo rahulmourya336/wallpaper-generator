@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from 'react'
-import { rendererOr, familyOf, DEFAULT_STYLE_ID } from '../engine/registry'
+import { allRenderers, rendererOr, familyOf, DEFAULT_STYLE_ID } from '../engine/registry'
 import { resolveParams } from '../engine/compositor'
 import { SEED_ALPHABET, SEED_LENGTH, isValidSeed } from '../engine/rng'
 import { DEFAULT_PRESET_ID, resolveSize } from '../export/presets'
@@ -220,15 +220,30 @@ export function useStudio(): StudioState {
 
 export const actions = {
   /**
-   * Unlocked: a new seed — new composition, same look.
-   * Locked: the composition holds and the tuning is re-rolled instead.
+   * Unlocked: a new style, category and seed, so shuffle explores the whole
+   * catalogue. Locked: the composition holds and the tuning is re-rolled.
    */
   shuffle(): void {
     if (state.seedLocked) {
       set({ params: randomizeParams(rendererOr(state.styleId).schema) }, { push: true })
-    } else {
-      set({ seed: newSeed() }, { push: true })
+      return
     }
+    /**
+     * Shuffle moves the whole idea, not just the dice.
+     *
+     * Re-rolling the seed alone kept every result inside the style you happened
+     * to land on, so shuffling repeatedly showed one motif over and over. It
+     * now picks a fresh style too, which is what makes the button a way to
+     * explore the catalogue rather than a way to resample one corner of it.
+     * The lock still holds everything but the parameters, so anyone who has
+     * found a style they like can pin it.
+     */
+    const styles = allRenderers()
+    const next = styles[Math.floor(randomUnit() * styles.length)] ?? rendererOr(state.styleId)
+    set(
+      { seed: newSeed(), styleId: next.id, categoryId: familyOf(next.id), params: {} },
+      { push: true },
+    )
   },
 
   /** Same seed, same params, different style. The filmstrip's whole purpose. */
