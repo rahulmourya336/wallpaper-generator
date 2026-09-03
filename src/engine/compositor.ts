@@ -7,6 +7,7 @@ import { fieldTransform, pickLayout, planLayout } from './layout'
 import type { LayoutId, LayoutPlan } from './layout'
 import { atmosphere, bloomed, groundFill, lightDefs, sheen } from './light'
 import { attrs, circlePath, clamp, el, f, group, lerp } from './svg'
+import { resolveToScene } from './scene/svg-backend'
 import type {
   Dimensions, Focal, FocalKind, ParamSchema, ParamValues, RenderContext, Renderer, Scene,
 } from './types'
@@ -221,7 +222,18 @@ export function compose(input: ComposeInput): ComposeResult {
     ramp: (t) => rampAt(palette, 0.12 + 0.88 * clamp(t, 0, 1)),
   }
 
-  const scene: Scene = renderer.render(ctx)
+  /**
+   * Two backends, one contract.
+   *
+   * A ported family emits a scene graph and knows nothing about SVG; the
+   * vector backend resolves it. An unported one still emits SVG source
+   * directly. Everything downstream of this line is identical for both, which
+   * is what lets the catalogue migrate a family at a time instead of in one
+   * jump.
+   */
+  const scene: Scene = renderer.build
+    ? resolveToScene(ctx, renderer.build(ctx))
+    : renderer.render(ctx)
 
   if (import.meta.env.DEV && !scene.accent && renderer.mode !== 'canvas') {
     console.warn(`[compositor] ${renderer.id} produced no accent element`)

@@ -1,5 +1,6 @@
 import type { Rng } from './rng'
 import type { Palette } from './palette'
+import type { SceneGraph } from './scene/types'
 
 export type Dimensions = { width: number; height: number }
 
@@ -119,7 +120,7 @@ export type Scene = {
   paint?: (c: CanvasRenderingContext2D, ctx: RenderContext) => void
 }
 
-export type Renderer = {
+type RendererBase = {
   id: string
   name: string
   family: FamilyId
@@ -129,8 +130,23 @@ export type Renderer = {
   sampler: 'field' | 'grid'
   mode?: 'svg' | 'canvas'
   schema: ParamSchema
-  render(ctx: RenderContext): Scene
 }
+
+/**
+ * A renderer supplies exactly one backend.
+ *
+ * `render` is the original one: it emits SVG source and the compositor
+ * decorates it. `build` is its replacement: it emits a scene graph and says
+ * nothing about strokes, fills or colour, leaving all of that to the post
+ * pipeline. Both are live during the migration, which is why this is a union
+ * rather than two optional fields — a renderer that supplies neither should
+ * not compile.
+ */
+export type Renderer = RendererBase &
+  (
+    | { render(ctx: RenderContext): Scene; build?: undefined }
+    | { build(ctx: RenderContext): SceneGraph; render?: undefined }
+  )
 
 export type Family = {
   id: FamilyId
