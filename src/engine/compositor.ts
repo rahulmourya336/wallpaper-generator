@@ -228,6 +228,23 @@ export function compose(input: ComposeInput): ComposeResult {
   }
 
   const inner = assemble(ctx, scene, renderer, plan)
+
+  /**
+   * Renderers now declare their own gradients and filters, and they share the
+   * uid namespace with the compositor's. A renderer that picks a name the
+   * compositor already uses does not error — the document simply resolves both
+   * references to whichever came first, and the result is a filter quietly
+   * doing the wrong job somewhere in the frame. That is invisible in review
+   * and obvious here, so it is checked here.
+   */
+  if (import.meta.env.DEV) {
+    const ids = inner.match(/ id="([^"]+)"/g) ?? []
+    if (ids.length !== new Set(ids).size) {
+      const seen = new Set<string>()
+      const dupes = ids.filter((id) => (seen.has(id) ? true : (seen.add(id), false)))
+      console.warn(`[compositor] ${renderer.id} declares duplicate ids: ${[...new Set(dupes)].join(', ')}`)
+    }
+  }
   const svg =
     '<svg xmlns="http://www.w3.org/2000/svg"' +
     attrs({
