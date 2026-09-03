@@ -4,6 +4,7 @@ import { makeRng, seedFrom } from '../engine/rng'
 import { resolveSize } from '../export/presets'
 import { actions, useStudio } from '../state/useStudio'
 import { CompositionView } from './CompositionView'
+import { Lightbox } from './Lightbox'
 import { PREVIEW_MAX_SHORT, fitAspect, useDebouncedComposition } from './useComposition'
 import { useElementSize } from './useElementSize'
 
@@ -95,10 +96,17 @@ function setAround(seed: string): string[] {
   return [seed, ...Array.from({ length: COUNT - 1 }, () => seedFrom(rng))]
 }
 
-export function Stage({ solo = false }: { solo?: boolean } = {}): React.JSX.Element {
+export function Stage({
+  solo = false,
+  onExport,
+}: {
+  solo?: boolean
+  onExport?: () => void
+} = {}): React.JSX.Element {
   const state = useStudio()
   const [rowRef, row] = useElementSize<HTMLDivElement>()
   const [candidates, setCandidates] = useState(() => setAround(state.seed))
+  const [zoomed, setZoomed] = useState(false)
   const preset = resolveSize(state.exportPreset)
   const aspect = preset.width / preset.height
 
@@ -147,10 +155,29 @@ export function Stage({ solo = false }: { solo?: boolean } = {}): React.JSX.Elem
               index={i}
               size={cell}
               selected={seed === state.seed}
-              onPick={() => actions.setSeed(seed)}
+              onPick={() => {
+                actions.setSeed(seed)
+                setZoomed(true)
+              }}
             />
           ))
         : null}
+      <Lightbox
+        seeds={candidates}
+        /**
+         * Derived, not stored. A shuffle from inside the full screen view
+         * replaces the whole candidate set, and an index held here would be
+         * pointing into the old one; reading it back off the selection means
+         * there is no second copy of the truth to keep in step.
+         */
+        index={zoomed ? Math.max(0, candidates.indexOf(state.seed)) : -1}
+        onIndex={(i) => {
+          const seed = candidates[i]
+          if (seed) actions.setSeed(seed)
+        }}
+        onClose={() => setZoomed(false)}
+        onExport={() => onExport?.()}
+      />
     </div>
   )
 }

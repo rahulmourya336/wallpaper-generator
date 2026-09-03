@@ -825,3 +825,103 @@ input[type='number'] {
   .topbar__now { display: none; }
   .topbar__action { margin-left: auto; }
 }
+
+/* --- full screen view ------------------------------------------------------ */
+
+/**
+ * A native <dialog> rather than a fixed overlay, for the same reasons the
+ * export dialog is one: focus is trapped, Escape closes it, and the rest of
+ * the page becomes inert without anyone maintaining a list of what to disable.
+ */
+.lb {
+  width: 100vw;
+  max-width: 100vw;
+  height: 100dvh;
+  max-height: 100dvh;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+  background: var(--art-ground, #0b0b0f);
+  color: var(--text);
+}
+
+.lb::backdrop { background: #05050B; }
+
+/* The deck holds every candidate side by side and slides; each frame is a
+   full viewport wide, so the translate is a whole number of screens. */
+.lb__deck {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  touch-action: pan-y;
+  will-change: transform;
+}
+
+.lb__frame {
+  position: relative;
+  flex: 0 0 100%;
+  width: 100%;
+  height: 100%;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+}
+
+/**
+ * Letterbox rather than stretch.
+ *
+ * A wallpaper is 9:16 and the viewport it is being shown on is whatever it is,
+ * so the frame has to fit the composition inside itself. The SVG does that on
+ * its own through preserveAspectRatio; the canvas needs telling, and can be
+ * told, because a canvas carries intrinsic dimensions from its width and
+ * height attributes and therefore honours object-fit.
+ */
+.lb__frame .composition__svg,
+.lb__frame .composition__raster {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.lb__close {
+  position: absolute;
+  top: max(0.75rem, env(safe-area-inset-top));
+  right: 0.75rem;
+  z-index: 4;
+  width: 2.4rem; height: 2.4rem;
+  display: grid; place-items: center;
+  font: inherit; font-size: 1.3rem; line-height: 1;
+  color: var(--text);
+  background: #101017c4;
+  backdrop-filter: blur(10px);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.lb__dots {
+  position: absolute;
+  left: 50%; translate: -50% 0;
+  top: max(0.95rem, env(safe-area-inset-top));
+  z-index: 4;
+  display: flex; gap: 0.35rem;
+}
+
+.lb__dots span {
+  width: 0.4rem; height: 0.4rem;
+  border-radius: 999px;
+  background: #ffffff4d;
+  transition: background 200ms ease, width 200ms ease;
+}
+
+.lb__dots span.is-on { width: 1.15rem; background: var(--art-accent, #fff); }
+
+/* The action bar is the same component as the stage's, anchored to the
+   viewport here rather than to the stage. */
+.lb__bar {
+  bottom: max(1.1rem, env(safe-area-inset-bottom));
+  z-index: 4;
+}

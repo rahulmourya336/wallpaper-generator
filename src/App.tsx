@@ -75,7 +75,7 @@ export function App(): React.JSX.Element {
             Pick the one you like
             <span>every design is one of a kind, shuffle for three more</span>
           </p>
-          <Stage solo={isMobile && snap !== 'peek'} />
+          <Stage solo={isMobile && snap !== 'peek'} onExport={() => setExporting(true)} />
           <StagePills onExport={() => setExporting(true)} />
         </section>
 
