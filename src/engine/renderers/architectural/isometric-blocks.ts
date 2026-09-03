@@ -123,7 +123,6 @@ export const isometricBlocks: Renderer = {
   name: 'Isometric Blocks',
   family: 'architectural',
   dark: true,
-  palettes: ['basalt', 'graphite', 'indigo', 'ember', 'chalk', 'seafog'],
   focals: ['diamond', 'circle', 'arch', 'ellipse'],
   sampler: 'grid',
   schema,

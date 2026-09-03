@@ -112,7 +112,6 @@ export const marbledInk: Renderer = {
   name: 'Marbled Ink',
   family: 'liquid',
   dark: true,
-  palettes: ['basalt', 'indigo', 'plum', 'ember', 'graphite', 'bone', 'dune'],
   focals: ['ellipse', 'circle', 'diamond', 'arch'],
   sampler: 'field',
   schema,

@@ -115,7 +115,6 @@ export const warpedGrid: Renderer = {
   name: 'Warped Op-Art Grid',
   family: 'technical',
   dark: true,
-  palettes: ['graphite', 'basalt', 'indigo', 'plum', 'chalk', 'bone'],
   focals: ['circle', 'ellipse', 'diamond'],
   sampler: 'grid',
   schema,

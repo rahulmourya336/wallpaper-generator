@@ -51,8 +51,8 @@ function render(ctx: RenderContext): Scene {
   for (let i = 0; i < stems; i++) {
     if ((i & 7) === 0 && ctx.expired()) break
     const rootX = lerp(-w * 0.05, w * 1.05, (i + skel.range(0.1, 0.9)) / stems)
-    const rootY = h + u(skel.range(6, 60))
-    const probeY = h * 0.62
+    const rootY = ctx.baseline + u(skel.range(6, 60))
+    const probeY = ctx.baseline * 0.78
     const fall = ctx.falloff(rootX, probeY)
     const dens = ctx.density(rootX, probeY)
 
@@ -148,7 +148,6 @@ export const botanicalStems: Renderer = {
   name: 'Botanical Stems',
   family: 'organic',
   dark: true,
-  palettes: ['verdigris', 'basalt', 'ember', 'plum', 'graphite', 'dune', 'bone'],
   focals: ['arch', 'circle', 'ellipse'],
   sampler: 'field',
   schema,

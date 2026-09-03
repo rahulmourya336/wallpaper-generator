@@ -120,7 +120,6 @@ export const moireInterference: Renderer = {
   name: 'Moiré Interference',
   family: 'geometric',
   dark: true,
-  palettes: ['basalt', 'graphite', 'indigo', 'plum', 'verdigris', 'chalk', 'bone'],
   focals: ['circle', 'ellipse', 'diamond'],
   sampler: 'field',
   schema,

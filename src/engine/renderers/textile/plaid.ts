@@ -131,7 +131,6 @@ export const plaid: Renderer = {
   name: 'Plaid',
   family: 'textile',
   dark: true,
-  palettes: ['basalt', 'ember', 'plum', 'verdigris', 'graphite', 'dune'],
   focals: ['diamond', 'circle', 'ellipse', 'arch'],
   sampler: 'grid',
   schema,

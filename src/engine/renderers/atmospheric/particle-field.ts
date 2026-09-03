@@ -101,7 +101,6 @@ export const particleField: Renderer = {
   name: 'Particle Field',
   family: 'atmospheric',
   dark: true,
-  palettes: ['basalt', 'indigo', 'graphite', 'plum', 'verdigris', 'seafog'],
   focals: ['circle', 'ellipse', 'diamond', 'arch'],
   sampler: 'field',
   schema,

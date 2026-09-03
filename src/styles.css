@@ -112,66 +112,9 @@ body {
 .stage__canvas {
   position: relative;
   flex: 1 1 auto;
-  min-height: 0;
+  /* never let the tray starve the canvas */
+  min-height: 46%;
   display: flex;
-}
-
-/* --- filmstrip ------------------------------------------------------------ */
-
-.strip {
-  flex: 0 0 auto;
-  padding-top: 0.9rem;
-  overflow-x: auto;
-  scrollbar-width: thin;
-}
-
-.strip__list {
-  display: flex;
-  gap: 0.6rem;
-  margin: 0;
-  padding: 0 0 0.4rem;
-  list-style: none;
-}
-
-.strip__item { flex: 0 0 auto; }
-
-.strip__btn {
-  display: flex;
-  flex-direction: column;
-  /* stretch would size the frame to the label text, not to its aspect ratio */
-  align-items: flex-start;
-  gap: 0.35rem;
-  padding: 0;
-  border: 0;
-  background: none;
-  color: var(--text-faint);
-  font: inherit;
-  font-size: 0.62rem;
-  letter-spacing: 0.06em;
-  cursor: pointer;
-  text-align: left;
-}
-
-.strip__frame {
-  position: relative;
-  display: block;
-  height: clamp(3.5rem, 11vh, 6.5rem);
-  width: auto;
-  flex: 0 0 auto;
-  overflow: hidden;
-  border-radius: 0.3rem;
-  box-shadow: 0 0 0 1px #ffffff14;
-}
-
-.strip__btn:hover .strip__frame { box-shadow: 0 0 0 1px #ffffff40; }
-.strip__btn:hover .strip__label { color: var(--text); }
-
-.strip__label {
-  display: block;
-  max-width: 6.5rem;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .canvas-fit {
@@ -768,3 +711,201 @@ input[type='range']:disabled {
 }
 
 .chip:has(input:disabled) { opacity: 0.4; cursor: not-allowed; }
+
+/* --- browse tray ---------------------------------------------------------- */
+
+/* the canvas stays the hero: the tray scrolls rather than growing */
+.browse {
+  flex: 0 0 auto;
+  max-height: min(12.5rem, 34vh);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  margin-top: 0.7rem;
+  padding-top: 0.7rem;
+  border-top: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  scrollbar-width: thin;
+}
+
+.browse__group { display: flex; flex-direction: column; gap: 0.45rem; }
+
+.browse__title {
+  display: flex;
+  align-items: baseline;
+  gap: 0.6rem;
+  margin: 0;
+  font-size: 0.6rem;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
+.browse__hint {
+  font-weight: 400;
+  letter-spacing: 0.04em;
+  text-transform: none;
+  font-size: 0.68rem;
+  color: var(--text-faint);
+}
+
+.browse__row {
+  display: flex;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0 0 0.3rem;
+  list-style: none;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+.browse__item { flex: 0 0 auto; }
+
+.browse__btn {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.3rem;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--text-faint);
+  font: inherit;
+  font-size: 0.62rem;
+  letter-spacing: 0.05em;
+  cursor: pointer;
+  text-align: left;
+}
+
+.browse__frame {
+  position: relative;
+  display: block;
+  width: auto;
+  flex: 0 0 auto;
+  overflow: hidden;
+  border-radius: 0.3rem;
+  box-shadow: 0 0 0 1px #ffffff12;
+  transition: box-shadow 140ms ease, transform 140ms ease;
+}
+
+.browse__btn--cat .browse__frame { height: 2.9rem; }
+.browse__btn--style .browse__frame { height: 4.3rem; }
+
+.browse__btn:hover .browse__frame {
+  box-shadow: 0 0 0 1px #ffffff45;
+  transform: translateY(-2px);
+}
+
+.browse__btn:hover .browse__label { color: var(--text); }
+
+.browse__btn.is-active .browse__frame {
+  box-shadow: 0 0 0 2px var(--art-accent, var(--focus));
+}
+
+.browse__btn.is-active .browse__label { color: var(--text); }
+
+.browse__label {
+  display: block;
+  max-width: 8rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.browse__sub {
+  font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  font-size: 0.58rem;
+  color: var(--text-faint);
+}
+
+/* --- chrome: give the studio some voice of its own ------------------------ */
+
+.topbar {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 1.2rem;
+}
+
+.topbar__brand { display: flex; align-items: center; gap: 0.6rem; }
+
+/* a small mark that takes the colour of whatever is on the canvas */
+.topbar__mark {
+  width: 0.9rem;
+  height: 0.9rem;
+  border-radius: 0.2rem;
+  background: var(--art-accent, var(--focus));
+  box-shadow: 0 0 0 3px #ffffff1a;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--art-accent, var(--focus)) 18%, transparent);
+  transition: background 400ms ease, box-shadow 400ms ease;
+}
+
+.topbar__title {
+  margin: 0;
+  font-size: 0.82rem;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.topbar__now {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 0.72rem;
+  color: var(--text-dim);
+}
+
+.topbar__sep {
+  width: 1rem;
+  height: 1px;
+  background: var(--chrome-300);
+}
+
+.topbar__crumb--strong { color: var(--text); }
+
+.topbar__toggle {
+  padding: 0.42rem 0.85rem;
+  font: inherit;
+  font-size: 0.7rem;
+  letter-spacing: 0.04em;
+  color: var(--text-dim);
+  background: var(--chrome-100);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.topbar__toggle:hover { color: var(--text); border-color: var(--chrome-300); }
+.topbar__toggle[aria-pressed='true'] {
+  color: var(--chrome-000);
+  background: var(--text);
+  border-color: var(--text);
+}
+
+/* the stage ground takes a wash of the artwork's own colour */
+.stage {
+  background: radial-gradient(120% 80% at 50% -10%, #14171c 0%, var(--chrome-000) 68%);
+  background:
+    radial-gradient(120% 80% at 50% -10%,
+      color-mix(in srgb, var(--art-ramp, #131519) 22%, var(--chrome-000)) 0%,
+      var(--chrome-000) 68%);
+  transition: background 500ms ease;
+}
+
+.canvas-frame {
+  box-shadow: 0 0 0 1px #00000060, 0 1.75rem 4rem -1.25rem #000000b0;
+  box-shadow:
+    0 0 0 1px #00000060,
+    0 1.75rem 4rem -1.25rem #000000b0,
+    0 0 5rem -1rem color-mix(in srgb, var(--art-accent, transparent) 22%, transparent);
+}
+
+.pill__btn--primary { background: var(--art-accent, var(--chrome-300)); color: #14100c; font-weight: 600; }
+.pill__btn--primary:hover { filter: brightness(1.12); }
+.pill__btn--icon.is-active { color: var(--art-accent, var(--focus)); }
+
+.rail__title { color: var(--art-accent, var(--text-faint)); }

@@ -108,7 +108,6 @@ export const circlePacking: Renderer = {
   name: 'Circle Packing',
   family: 'cellular',
   dark: true,
-  palettes: ['basalt', 'verdigris', 'graphite', 'ember', 'indigo', 'bone', 'chalk'],
   focals: ['circle', 'ellipse', 'arch', 'diamond'],
   sampler: 'field',
   schema,

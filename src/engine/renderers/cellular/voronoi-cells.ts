@@ -168,7 +168,6 @@ export const voronoiCells: Renderer = {
   name: 'Voronoi Cells',
   family: 'cellular',
   dark: true,
-  palettes: ['basalt', 'graphite', 'ember', 'verdigris', 'indigo', 'chalk', 'bone'],
   focals: ['circle', 'diamond', 'ellipse', 'arch'],
   sampler: 'field',
   schema,

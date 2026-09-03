@@ -139,7 +139,6 @@ export const circuitTraces: Renderer = {
   name: 'Circuit Traces',
   family: 'technical',
   dark: true,
-  palettes: ['basalt', 'verdigris', 'graphite', 'indigo', 'ember', 'chalk'],
   focals: ['circle', 'diamond', 'ellipse', 'arch'],
   sampler: 'grid',
   schema,

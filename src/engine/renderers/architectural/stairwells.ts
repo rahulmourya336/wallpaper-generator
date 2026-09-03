@@ -114,7 +114,6 @@ export const stairwells: Renderer = {
   name: 'Stairwells',
   family: 'architectural',
   dark: true,
-  palettes: ['basalt', 'graphite', 'plum', 'ember', 'indigo', 'chalk'],
   focals: ['diamond', 'circle', 'arch', 'ellipse'],
   sampler: 'grid',
   schema,

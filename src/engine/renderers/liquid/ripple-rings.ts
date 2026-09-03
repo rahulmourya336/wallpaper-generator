@@ -122,7 +122,6 @@ export const rippleRings: Renderer = {
   name: 'Ripple Rings',
   family: 'liquid',
   dark: true,
-  palettes: ['basalt', 'indigo', 'verdigris', 'graphite', 'plum', 'seafog'],
   focals: ['circle', 'ellipse', 'diamond'],
   sampler: 'field',
   schema,

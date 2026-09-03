@@ -105,7 +105,6 @@ export const halftoneSphere: Renderer = {
   name: 'Halftone Sphere',
   family: 'retro-pop',
   dark: true,
-  palettes: ['basalt', 'ember', 'plum', 'graphite', 'indigo', 'bone', 'dune'],
   focals: ['circle', 'disc', 'ellipse'],
   sampler: 'grid',
   schema,

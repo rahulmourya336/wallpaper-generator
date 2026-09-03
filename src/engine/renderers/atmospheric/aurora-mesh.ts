@@ -162,7 +162,6 @@ export const auroraMesh: Renderer = {
   name: 'Aurora Mesh',
   family: 'atmospheric',
   dark: true,
-  palettes: ['indigo', 'verdigris', 'plum', 'basalt', 'graphite'],
   focals: ['ellipse', 'circle', 'arch'],
   sampler: 'field',
   mode: 'canvas',

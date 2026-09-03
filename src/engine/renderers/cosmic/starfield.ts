@@ -119,7 +119,6 @@ export const starfield: Renderer = {
   name: 'Starfield',
   family: 'cosmic',
   dark: true,
-  palettes: ['basalt', 'indigo', 'plum', 'graphite', 'verdigris'],
   focals: ['circle', 'ellipse', 'disc'],
   sampler: 'field',
   schema,

@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useEffect, useMemo } from 'react'
 import { resolveSize } from '../export/presets'
 import { rendererOr } from '../engine/registry'
 import { useStudio } from '../state/useStudio'
@@ -40,6 +40,20 @@ export function Canvas(): React.JSX.Element {
    */
   const shown = result ? result.width / result.height : aspect
   const display = useMemo(() => fitAspect(box, shown), [box, shown])
+
+  /**
+   * Publish the composition's own colours to the chrome. The studio around the
+   * canvas was the same grey whatever was on it, which is a large part of why
+   * the app read as bland: the artwork is the only thing with a voice, so the
+   * interface should borrow it rather than ignore it.
+   */
+  useEffect(() => {
+    if (!result) return
+    const root = document.documentElement
+    root.style.setProperty('--art-accent', result.palette.accent)
+    root.style.setProperty('--art-ground', result.palette.ground)
+    root.style.setProperty('--art-ramp', result.palette.ramp[3])
+  }, [result])
 
   const label = `${renderer.name} wallpaper, seed ${state.seed}, ${size.width} by ${size.height} pixels`
 

@@ -1,6 +1,7 @@
 import { resolveParams } from '../engine/compositor'
 import { PALETTES } from '../engine/palette'
 import { FAMILIES, getFamily, rendererOr } from '../engine/registry'
+import { characterOf } from '../engine/character'
 import { groupedPresets, resolveSize } from '../export/presets'
 import { AUTO_PALETTE, actions, useStudio } from '../state/useStudio'
 import type { ParamSpec } from '../engine/types'
@@ -49,7 +50,9 @@ export function ControlRail({ id, hidden }: { id?: string; hidden?: boolean } = 
   const renderer = rendererOr(state.styleId)
   const family = getFamily(state.categoryId) ?? FAMILIES[0]
   const resolved = resolveParams(renderer.schema, state.params)
-  const availablePalettes = PALETTES.filter((p) => renderer.palettes.includes(p.id))
+  // the family owns the palette pool; that is what gives a category its taste
+  const pool = characterOf(renderer.family).palettes
+  const availablePalettes = PALETTES.filter((p) => pool.includes(p.id))
   const size = resolveSize(state.exportPreset)
 
   /**

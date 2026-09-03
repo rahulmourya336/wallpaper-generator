@@ -36,7 +36,7 @@ function render(ctx: RenderContext): Scene {
 
   const pitch = w / Math.max(2, Math.round(lerp(3, 9, cellK)))
   const towers = Math.ceil(w / pitch) + 2
-  const baseY = h + u(20)
+  const baseY = ctx.baseline + u(20)
   const shadowDir = light.dx >= 0 ? 1 : -1
 
   let accent: string | undefined
@@ -45,7 +45,7 @@ function render(ctx: RenderContext): Scene {
   for (let i = -1; i < towers; i++) {
     if (ctx.expired()) break
     const cx = i * pitch + pitch * 0.5
-    const fall = ctx.falloff(cx, h * 0.6)
+    const fall = ctx.falloff(cx, ctx.baseline * 0.75)
     const slabs = Math.max(3, Math.round(lerp(5, 18, heightK) * (0.5 + 0.7 * fall)))
     // Distribute a target height across the stack rather than summing fixed
     // slab heights: otherwise the towers land wherever the arithmetic happens
@@ -134,7 +134,6 @@ export const brutalistStacks: Renderer = {
   name: 'Brutalist Stacks',
   family: 'architectural',
   dark: true,
-  palettes: ['graphite', 'basalt', 'ember', 'indigo', 'chalk', 'bone'],
   focals: ['arch', 'circle', 'diamond', 'ellipse'],
   sampler: 'grid',
   schema,

@@ -108,7 +108,6 @@ export const contourBands: Renderer = {
   name: 'Contour Bands',
   family: 'organic',
   dark: true,
-  palettes: ['basalt', 'verdigris', 'ember', 'graphite', 'indigo', 'dune', 'bone'],
   focals: ['circle', 'ellipse', 'arch', 'diamond'],
   sampler: 'field',
   schema,

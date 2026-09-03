@@ -148,7 +148,6 @@ export const lowPolyShards: Renderer = {
   name: 'Low-Poly Shards',
   family: 'geometric',
   dark: true,
-  palettes: ['basalt', 'graphite', 'plum', 'indigo', 'ember', 'chalk', 'seafog'],
   focals: ['circle', 'diamond', 'ellipse', 'arch'],
   sampler: 'field',
   schema,

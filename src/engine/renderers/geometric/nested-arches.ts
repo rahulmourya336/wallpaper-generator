@@ -62,7 +62,8 @@ function render(ctx: RenderContext): Scene {
 
   const cols = 2 + Math.round(densityK * 3)
   const gap = w / Math.max(1, cols - 1)
-  const bottom = h + u(12)
+  // the colonnade sits on the layout baseline, not on the frame
+  const bottom = ctx.baseline + ctx.short * 0.35
 
   const focalTop = focal.cy - focal.ry
   const focalBottom = focal.cy + focal.ry
@@ -75,8 +76,12 @@ function render(ctx: RenderContext): Scene {
     const bx = i * gap
     const nx = n(bx)
     const cx = bx + ctx.fbm(nx * 0.003, 17) * turb * gap * 0.28
+    // the springline sits a fixed distance above the ground, so the colonnade
+    // travels with the baseline instead of scaling off the bottom of the frame
     const spring =
-      h * (0.62 + ctx.fbm(nx * 0.0019, 41.5) * 0.13 * turb) + skel.range(-1, 1) * u(20)
+      ctx.baseline -
+      ctx.short * (0.07 + 0.14 * (0.5 + 0.5 * ctx.fbm(nx * 0.0019, 41.5) * turb)) +
+      skel.range(-1, 1) * u(20)
     const rMax = gap * skel.range(1.05, 1.5) * lerp(0.8, 1.1, ctx.falloff(cx, spring - gap))
     columns.push({
       cx,
@@ -307,7 +312,6 @@ export const nestedArches: Renderer = {
   name: 'Nested Arches',
   family: 'geometric',
   dark: true,
-  palettes: ['basalt', 'graphite', 'ember', 'indigo', 'verdigris', 'bone', 'dune'],
   focals: ['arch', 'circle', 'ellipse', 'diamond'],
   sampler: 'field',
   schema,

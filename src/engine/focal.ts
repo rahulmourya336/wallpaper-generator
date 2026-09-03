@@ -2,9 +2,9 @@ import type { Focal, FocalKind } from './types'
 import { circlePath, ellipsePath, f } from './svg'
 
 /**
- * The single dominant form. Placement is compositor-owned so no family can
- * break the rule that the top third of a portrait composition stays quiet —
- * that is where the clock and notifications sit.
+ * The dominant form. Placement is layout-owned (see `layout.ts`) so no family
+ * can break the rule that the top third of a portrait composition stays quiet,
+ * which is where the clock and notifications sit.
  */
 export function makeFocal(kind: FocalKind, cx: number, cy: number, rx: number, ry: number): Focal {
   switch (kind) {
@@ -29,6 +29,33 @@ export function makeFocal(kind: FocalKind, cx: number, cy: number, rx: number, r
         path: `M${f(cx)} ${f(cy - ry)}L${f(cx + rx)} ${f(cy)}L${f(cx)} ${f(cy + ry)}L${f(cx - rx)} ${f(cy)}Z`,
         contains: (x, y) => Math.abs(x - cx) / rx + Math.abs(y - cy) / ry <= 1,
       }
+    case 'lens': {
+      // a vesica: two arcs meeting at points, top and bottom
+      const bulge = rx * 1.35
+      return {
+        kind, cx, cy, rx, ry,
+        path:
+          `M${f(cx)} ${f(cy - ry)}` +
+          `A${f(bulge)} ${f(ry * 1.6)} 0 0 1 ${f(cx)} ${f(cy + ry)}` +
+          `A${f(bulge)} ${f(ry * 1.6)} 0 0 1 ${f(cx)} ${f(cy - ry)}Z`,
+        // the analytic test only has to be close; it gates thousands of samples
+        contains: (x, y) => ((x - cx) / (rx * 0.86)) ** 2 + ((y - cy) / ry) ** 2 <= 1,
+      }
+    }
+    case 'portal': {
+      // a rounded slab: straight sides, generous corners, sits like a doorway
+      const r = Math.min(rx, ry) * 0.42
+      return {
+        kind, cx, cy, rx, ry,
+        path:
+          `M${f(cx - rx + r)} ${f(cy - ry)}H${f(cx + rx - r)}` +
+          `A${f(r)} ${f(r)} 0 0 1 ${f(cx + rx)} ${f(cy - ry + r)}` +
+          `V${f(cy + ry - r)}A${f(r)} ${f(r)} 0 0 1 ${f(cx + rx - r)} ${f(cy + ry)}` +
+          `H${f(cx - rx + r)}A${f(r)} ${f(r)} 0 0 1 ${f(cx - rx)} ${f(cy + ry - r)}` +
+          `V${f(cy - ry + r)}A${f(r)} ${f(r)} 0 0 1 ${f(cx - rx + r)} ${f(cy - ry)}Z`,
+        contains: (x, y) => Math.abs(x - cx) <= rx && Math.abs(y - cy) <= ry,
+      }
+    }
     case 'arch': {
       const w = Math.min(rx, ry * 0.85)
       const top = cy - ry

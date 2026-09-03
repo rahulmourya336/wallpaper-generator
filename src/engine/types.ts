@@ -7,7 +7,7 @@ export type FamilyId =
   | 'geometric' | 'organic' | 'retro-pop' | 'atmospheric' | 'technical'
   | 'cosmic' | 'textile' | 'architectural' | 'liquid' | 'cellular'
 
-export type FocalKind = 'arch' | 'circle' | 'diamond' | 'ellipse' | 'disc'
+export type FocalKind = 'arch' | 'circle' | 'diamond' | 'ellipse' | 'disc' | 'lens' | 'portal'
 
 export type Focal = {
   kind: FocalKind
@@ -58,7 +58,20 @@ export type RenderContext = {
   expired(): boolean
 
   palette: Palette
+  /** the subject renderers aim at */
   focal: Focal
+  /** every focal form in the layout; density and masking use all of them */
+  focals: readonly Focal[]
+  /** the subject centre as fractions of the canvas, for structural placement */
+  anchor: { x: number; y: number }
+  /**
+   * A ground line in field space, set under the subject by the layout.
+   *
+   * Families that grow from a floor used to weld it to the bottom edge, so
+   * every composition in those families had its horizon in the same place no
+   * matter where the layout put the subject. Sit on this instead.
+   */
+  baseline: number
   /** one light source per composition; every shadow agrees with it */
   light: { angle: number; dx: number; dy: number }
 
@@ -101,10 +114,8 @@ export type Renderer = {
   id: string
   name: string
   family: FamilyId
-  /** at least half the styles in every family must be dark */
+  /** biases the family palette pool toward its dark or light members */
   dark: boolean
-  /** palette ids this style is designed against; the first is its default */
-  palettes: readonly string[]
   focals: readonly FocalKind[]
   sampler: 'field' | 'grid'
   mode?: 'svg' | 'canvas'

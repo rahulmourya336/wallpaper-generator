@@ -106,7 +106,6 @@ export const ribbonBands: Renderer = {
   name: 'Ribbon Bands',
   family: 'retro-pop',
   dark: true,
-  palettes: ['ember', 'plum', 'basalt', 'indigo', 'dune', 'bone'],
   focals: ['circle', 'ellipse', 'diamond', 'arch'],
   sampler: 'field',
   schema,

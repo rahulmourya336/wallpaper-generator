@@ -96,7 +96,6 @@ export const terrazzoChips: Renderer = {
   name: 'Terrazzo Chips',
   family: 'retro-pop',
   dark: false,
-  palettes: ['bone', 'dune', 'chalk', 'seafog', 'basalt', 'plum', 'ember'],
   focals: ['circle', 'ellipse', 'arch', 'diamond'],
   sampler: 'field',
   schema,

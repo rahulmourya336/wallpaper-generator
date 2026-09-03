@@ -110,7 +110,6 @@ export const flowField: Renderer = {
   name: 'Flow Field',
   family: 'organic',
   dark: true,
-  palettes: ['basalt', 'indigo', 'verdigris', 'plum', 'graphite', 'seafog', 'bone'],
   focals: ['circle', 'ellipse', 'arch', 'diamond'],
   sampler: 'field',
   schema,

@@ -135,7 +135,6 @@ export const stitchGrid: Renderer = {
   name: 'Stitch Grid',
   family: 'textile',
   dark: true,
-  palettes: ['basalt', 'ember', 'plum', 'verdigris', 'graphite', 'bone', 'dune'],
   focals: ['diamond', 'circle', 'arch', 'ellipse'],
   sampler: 'grid',
   schema,

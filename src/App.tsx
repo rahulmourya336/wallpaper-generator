@@ -1,15 +1,17 @@
 import { useState } from 'react'
 import { BottomSheet } from './ui/BottomSheet'
 import type { Snap } from './ui/BottomSheet'
+import { Browser } from './ui/Browser'
 import { Canvas } from './ui/Canvas'
 import { ControlRail } from './ui/ControlRail'
 import { ExportDialog } from './ui/ExportDialog'
-import { Filmstrip } from './ui/Filmstrip'
 import { StagePills } from './ui/StagePills'
 import { MOBILE_QUERY, useMediaQuery } from './ui/useMediaQuery'
 import { actions, useStudio } from './state/useStudio'
+import { rendererOr } from './engine/registry'
+import { getFamily } from './engine/registry'
 
-const PEEK_HEIGHT = 168
+const PEEK_HEIGHT = 176
 
 function RailToggle({ open, onToggle }: { open: boolean; onToggle: () => void }): React.JSX.Element {
   return (
@@ -34,8 +36,11 @@ export function App(): React.JSX.Element {
   const isMobile = useMediaQuery(MOBILE_QUERY)
   const [exporting, setExporting] = useState(false)
   const [snap, setSnap] = useState<Snap>('peek')
+  const [browsing, setBrowsing] = useState(true)
 
   const openExport = () => setExporting(true)
+  const renderer = rendererOr(state.styleId)
+  const family = getFamily(state.categoryId)
 
   return (
     <div
@@ -44,10 +49,23 @@ export function App(): React.JSX.Element {
     >
       {isMobile ? null : (
         <header className="topbar">
-          <h1 className="topbar__title">
-            Wallpaper Studio
-            <span className="topbar__sub">Generative wallpapers, rendered in your browser</span>
-          </h1>
+          <div className="topbar__brand">
+            <span className="topbar__mark" aria-hidden="true" />
+            <h1 className="topbar__title">Wallpaper Studio</h1>
+          </div>
+          <p className="topbar__now">
+            <span className="topbar__crumb">{family?.name}</span>
+            <span className="topbar__sep" aria-hidden="true" />
+            <span className="topbar__crumb topbar__crumb--strong">{renderer.name}</span>
+          </p>
+          <button
+            type="button"
+            className="topbar__toggle"
+            onClick={() => setBrowsing((v) => !v)}
+            aria-pressed={browsing}
+          >
+            {browsing ? 'Hide gallery' : 'Browse styles'}
+          </button>
         </header>
       )}
 
@@ -64,9 +82,9 @@ export function App(): React.JSX.Element {
             snap={snap}
             onSnapChange={setSnap}
             peekHeight={PEEK_HEIGHT}
-            label="Composition controls"
+            label="Browse and tune"
           >
-            <Filmstrip />
+            <Browser />
             <ControlRail />
           </BottomSheet>
         </main>
@@ -77,7 +95,7 @@ export function App(): React.JSX.Element {
               <Canvas />
               <StagePills onExport={openExport} />
             </div>
-            <Filmstrip />
+            {browsing ? <Browser /> : null}
           </section>
           <RailToggle
             open={!state.focusMode}

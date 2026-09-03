@@ -121,7 +121,6 @@ export const orbitalPaths: Renderer = {
   name: 'Orbital Paths',
   family: 'cosmic',
   dark: true,
-  palettes: ['basalt', 'graphite', 'indigo', 'ember', 'plum', 'chalk'],
   focals: ['disc', 'circle', 'ellipse'],
   sampler: 'field',
   schema,

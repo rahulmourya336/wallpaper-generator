@@ -1,11 +1,13 @@
 import { makeRng } from './rng'
 import { makeNoise } from './noise'
-import { getPalette, mixHex, PALETTES, rampAt, withAlpha } from './palette'
+import { getPalette, mixHex, PALETTES, rampAt, suitsMode, withAlpha } from './palette'
 import type { Palette } from './palette'
-import { makeFocal } from './focal'
+import { characterOf } from './character'
+import { fieldTransform, pickLayout, planLayout } from './layout'
+import type { LayoutId, LayoutPlan } from './layout'
 import { attrs, circlePath, clamp, el, f, group, lerp } from './svg'
 import type {
-  Dimensions, FocalKind, ParamSchema, ParamValues, RenderContext, Renderer, Scene,
+  Dimensions, Focal, FocalKind, ParamSchema, ParamValues, RenderContext, Renderer, Scene,
 } from './types'
 
 export type ComposeInput = {
@@ -13,7 +15,7 @@ export type ComposeInput = {
   seed: string
   params: ParamValues
   dims: Dimensions
-  /** caller-chosen palette; falls back to the renderer's own list */
+  /** caller-chosen palette; falls back to the family pool */
   paletteId?: string
   /** 0.25 filmstrip | 1 canvas | 1..4 export */
   quality?: number
@@ -27,6 +29,7 @@ export type ComposeResult = {
   width: number
   height: number
   palette: Palette
+  layout: LayoutId
   paint?: (c: CanvasRenderingContext2D) => void
   /** true if a renderer bailed out of a growth loop on the time budget */
   truncated: boolean
@@ -52,10 +55,10 @@ export function resolveParams(
 
 /**
  * Wall-clock budget by sample density. The thumbnail figure is deliberately
- * tight: the filmstrip renders six compositions in one synchronous pass, so a
- * 45ms budget put a visible 300ms stall on every style switch. Renderers bail
- * out of growth loops gracefully, and at thumbnail scale the missing elements
- * are not visible.
+ * tight: the filmstrip renders several compositions in one synchronous pass,
+ * so a generous budget puts a visible stall on every style switch. Renderers
+ * bail out of growth loops gracefully, and at thumbnail scale the missing
+ * elements are not visible.
  */
 function defaultBudget(quality: number): number {
   if (quality <= 0.4) return 20
@@ -82,45 +85,51 @@ export function compose(input: ComposeInput): ComposeResult {
   const w = Math.max(1, Math.round(dims.width))
   const h = Math.max(1, Math.round(dims.height))
   const short = Math.min(w, h)
+  const aspect = w / h
   const params = resolveParams(renderer.schema, input.params)
+  const character = characterOf(renderer.family)
 
   // Stage streams. Skeleton decisions must never share a stream with per-sample
   // draws, or the filmstrip thumbnail would show a different composition from
   // the canvas it is meant to restyle.
   const root = makeRng(seed, renderer.id)
   const paletteRng = root.fork('palette')
+  const layoutRng = root.fork('layout')
   const focalRng = root.fork('focal')
   const lightRng = root.fork('light')
   const noiseRng = root.fork('noise')
 
-  const allowed = renderer.palettes.length ? renderer.palettes : PALETTES.map((p) => p.id)
+  // --- palette: the family's pool, biased to the style's declared mode -----
+  const pool = character.palettes.length ? character.palettes : PALETTES.map((p) => p.id)
   const requested = input.paletteId
   const fromParams = typeof params['palette'] === 'string' ? (params['palette'] as string) : undefined
-  // Auto-pick leans to the style's declared mode: most people set dark
-  // wallpapers, and a style declared dark should mostly land there.
-  const preferred = allowed.filter((id) => getPalette(id)?.mode === (renderer.dark ? 'dark' : 'light'))
+  const preferred = pool.filter((id) => {
+    const p = getPalette(id)
+    return p ? suitsMode(p, renderer.dark) : false
+  })
   const chosenId =
-    requested && allowed.includes(requested) ? requested
-    : fromParams && allowed.includes(fromParams) ? fromParams
-    : preferred.length && paletteRng.bool(0.75) ? paletteRng.pick(preferred)
-    : paletteRng.pick(allowed)
-  const palette = getPalette(chosenId) ?? (getPalette(allowed[0] as string) as Palette)
+    requested && pool.includes(requested) ? requested
+    : fromParams && pool.includes(fromParams) ? fromParams
+    : preferred.length && paletteRng.bool(0.78) ? paletteRng.pick(preferred)
+    : paletteRng.pick(pool)
+  const palette = getPalette(chosenId) ?? (getPalette(pool[0] as string) as Palette)
 
-  // Focal placement. Portrait centres sit below the notification band by
-  // construction; no renderer gets the chance to violate it.
+  // --- layout: where the subject sits, and how the field is turned ---------
   const formParam = params['form']
   const kind: FocalKind =
     typeof formParam === 'string' && formParam !== 'auto'
       ? (formParam as FocalKind)
       : focalRng.pick(renderer.focals)
-  const aspect = w / h
-  const cx = w * focalRng.range(0.38, 0.62)
-  const cy = h * (aspect < 1 ? focalRng.range(0.54, 0.72) : focalRng.range(0.46, 0.62))
-  const baseR = short * focalRng.range(0.3, 0.42)
-  const ry = kind === 'arch'
-    ? baseR * focalRng.range(1.35, 1.8)
-    : baseR * focalRng.range(0.92, 1.18)
-  const focal = makeFocal(kind, cx, cy, baseR, ry)
+  const layoutId = pickLayout(layoutRng, character.layouts)
+  const plan = planLayout(
+    layoutId,
+    layoutRng,
+    { w, h, short, aspect },
+    kind,
+    focalRng.pick(renderer.focals),
+  )
+  const focal = plan.focals[0] as Focal
+  const focals = plan.focals
 
   // One light source, kept in the upper half so every shadow falls downward.
   const angle = lightRng.range(-Math.PI * 0.82, -Math.PI * 0.18)
@@ -130,8 +139,20 @@ export function compose(input: ComposeInput): ComposeResult {
 
   const falloffK = typeof params['falloff'] === 'number' ? (params['falloff'] as number) : 0.55
   const falloffR = short * (0.45 + 0.95 * falloffK)
-  const decay = (x: number, y: number) =>
-    clamp(1 - (Math.hypot(x - cx, y - cy) / falloffR) ** 1.6, 0, 1)
+  // Falloff answers to the nearest focal, so a twin layout gets two centres of
+  // interest rather than one plus a shape sitting in a dead part of the field.
+  const decay = (x: number, y: number) => {
+    let best = 0
+    for (const foc of focals) {
+      const d = clamp(1 - (Math.hypot(x - foc.cx, y - foc.cy) / falloffR) ** 1.6, 0, 1)
+      if (d > best) best = d
+    }
+    return best
+  }
+  const inside = (x: number, y: number) => {
+    for (const foc of focals) if (foc.contains(x, y)) return true
+    return false
+  }
 
   const now = () => (typeof performance !== 'undefined' ? performance.now() : Date.now())
   const deadline = now() + (input.budgetMs ?? defaultBudget(quality))
@@ -144,7 +165,11 @@ export function compose(input: ComposeInput): ComposeResult {
     w, h, aspect, short,
     u: (units) => (units * short) / 1000,
     n: (px) => (px * 1000) / short,
-    quality,
+    // Zoom magnifies the field, so the same element count covers less of the
+    // screen. Without a matching lift in sample density a close crop arrives as
+    // an empty frame with three lines in it. The budget still keys off the
+    // caller's quality, so this cannot blow the render time out.
+    quality: quality * plan.zoom,
     expired: () => {
       if (now() > deadline) {
         truncated = true
@@ -154,9 +179,22 @@ export function compose(input: ComposeInput): ComposeResult {
     },
     palette,
     focal,
+    focals,
+    anchor: { x: focal.cx / w, y: focal.cy / h },
+    baseline: Math.max(h * 0.45, Math.min(h * 0.86, focal.cy + focal.ry * 0.5)),
     light,
     falloff: decay,
-    density: (x, y) => (focal.contains(x, y) ? 1 : 0.25) * (0.35 + 0.65 * decay(x, y)),
+    /**
+     * Subject and ground, with a floor.
+     *
+     * A quarter density outside the form was tuned when every composition put
+     * its subject near the middle, so the falloff always covered most of the
+     * frame. Once layouts push the subject low, to an edge, or right out of
+     * the middle, whole regions fall to almost nothing and the picture arrives
+     * as bare ground with a detail in one corner. The step is still clearly
+     * readable; it just no longer bottoms out.
+     */
+    density: (x, y) => (inside(x, y) ? 1 : 0.42) * (0.52 + 0.48 * decay(x, y)),
     noise2: noise.noise2,
     fbm: noise.fbm,
     num: (key) => {
@@ -167,7 +205,18 @@ export function compose(input: ComposeInput): ComposeResult {
       const v = params[key]
       return typeof v === 'string' ? v : ''
     },
-    ramp: (t) => rampAt(palette, t),
+    /**
+     * Ramp with a floor under it.
+     *
+     * ramp[0] is defined as barely separating from the ground, and renderers
+     * reach for the bottom of the ramp for ambient structure and then draw it
+     * at a fifth opacity. On the lightest palettes that still reads; on the
+     * darkest it is the ground exactly, which is how a composition with four
+     * hundred elements in it arrives looking empty. Lifting the low end keeps
+     * every ambient mark on the right side of visible without touching the
+     * strong values, where the ramp still ends exactly where it did.
+     */
+    ramp: (t) => rampAt(palette, 0.12 + 0.88 * clamp(t, 0, 1)),
   }
 
   const scene: Scene = renderer.render(ctx)
@@ -176,7 +225,7 @@ export function compose(input: ComposeInput): ComposeResult {
     console.warn(`[compositor] ${renderer.id} produced no accent element`)
   }
 
-  const inner = assemble(ctx, scene, renderer)
+  const inner = assemble(ctx, scene, renderer, plan)
   const svg =
     '<svg xmlns="http://www.w3.org/2000/svg"' +
     attrs({
@@ -187,31 +236,45 @@ export function compose(input: ComposeInput): ComposeResult {
     }) +
     `>${inner}</svg>`
 
-  const result: ComposeResult = { svg, inner, width: w, height: h, palette, truncated }
+  const result: ComposeResult = {
+    svg, inner, width: w, height: h, palette, layout: plan.id, truncated,
+  }
   if (scene.paint) result.paint = (c: CanvasRenderingContext2D) => scene.paint?.(c, ctx)
   return result
 }
 
-function assemble(ctx: RenderContext, scene: Scene, renderer: Renderer): string {
-  const { w, h, short, palette: p, focal } = ctx
+function assemble(
+  ctx: RenderContext,
+  scene: Scene,
+  renderer: Renderer,
+  plan: LayoutPlan,
+): string {
+  const { w, h, short, palette: p, focals } = ctx
+  const character = characterOf(renderer.family)
   const uid = `c${(hashString(`${ctx.seed}:${renderer.id}`) >>> 0).toString(36)}`
+  const formPath = focals.map((foc) => foc.path).join('')
 
   // --- stage 0: defs -------------------------------------------------------
-  const vignetteR = Math.hypot(Math.max(focal.cx, w - focal.cx), Math.max(focal.cy, h - focal.cy))
+  // The vignette centres on where the subject lands ON SCREEN, which is not
+  // where it lives in field space once the field is rotated and scaled.
+  const sx = plan.screen.cx
+  const sy = plan.screen.cy
+  const vignetteR = Math.hypot(Math.max(sx, w - sx), Math.max(sy, h - sy))
   const vignetteColor = mixHex(p.ink, '#0A0C12', 0.55)
+  const vig = (a: number) => (a * character.vignette).toFixed(3)
 
   const defs: string[] = [
     el('clipPath', { id: `${uid}-in`, clipPathUnits: 'userSpaceOnUse' },
-      el('path', { d: focal.path })),
-    // inverse clip: the canvas rect plus the focal subpath, resolved evenodd
+      el('path', { d: formPath })),
+    // inverse clip: the canvas rect plus every focal subpath, resolved evenodd
     el('clipPath', { id: `${uid}-out`, clipPathUnits: 'userSpaceOnUse' },
-      el('path', { d: `M0 0H${f(w)}V${f(h)}H0Z${focal.path}`, 'clip-rule': 'evenodd' })),
+      el('path', { d: `M0 0H${f(w)}V${f(h)}H0Z${formPath}`, 'clip-rule': 'evenodd' })),
     el('radialGradient',
-      { id: `${uid}-vig`, gradientUnits: 'userSpaceOnUse', cx: focal.cx, cy: focal.cy, r: vignetteR },
+      { id: `${uid}-vig`, gradientUnits: 'userSpaceOnUse', cx: sx, cy: sy, r: vignetteR },
       el('stop', { offset: '0', 'stop-color': vignetteColor, 'stop-opacity': 0 }) +
-      el('stop', { offset: '0.5', 'stop-color': vignetteColor, 'stop-opacity': 0.05 }) +
-      el('stop', { offset: '0.82', 'stop-color': vignetteColor, 'stop-opacity': 0.22 }) +
-      el('stop', { offset: '1', 'stop-color': vignetteColor, 'stop-opacity': 0.42 })),
+      el('stop', { offset: '0.5', 'stop-color': vignetteColor, 'stop-opacity': vig(0.05) }) +
+      el('stop', { offset: '0.82', 'stop-color': vignetteColor, 'stop-opacity': vig(0.22) }) +
+      el('stop', { offset: '1', 'stop-color': vignetteColor, 'stop-opacity': vig(0.42) })),
     // Grain as a stitched tile behind a pattern: filter cost is constant in
     // canvas size, so a 4x export costs the same as a thumbnail.
     el('filter',
@@ -237,54 +300,59 @@ function assemble(ctx: RenderContext, scene: Scene, renderer: Renderer): string 
     ...(scene.defs ?? []),
   ]
 
+  // --- the field: everything the layout transform applies to ---------------
+  const field: string[] = []
+
+  // stage 2: far field, outside the focal form
+  field.push(group({ 'clip-path': `url(#${uid}-out)` }, scene.back))
+
+  // stage 3: elements passing behind the focal form
+  field.push(group({}, scene.behind))
+
+  // stage 4: the focal form, with a misregistered outline
+  if (renderer.mode !== 'canvas') {
+    const off = ctx.u(2.6)
+    for (const foc of focals) {
+      field.push(
+        el('path', { d: foc.path, fill: mixHex(p.ground, p.ramp[0], character.formFill) }) +
+          el('path', {
+            d: foc.path,
+            fill: 'none',
+            stroke: withAlpha(ctx.ramp(0.7), 0.55),
+            'stroke-width': ctx.u(1.6),
+            transform: `translate(${f(off * ctx.light.dx)} ${f(-off * ctx.light.dy)})`,
+          }),
+      )
+    }
+  }
+
+  // stage 5: the field at full density, clipped to the form
+  field.push(group({ 'clip-path': `url(#${uid}-in)` }, scene.subject))
+
+  // stage 6: ghost geometry
+  field.push(group({ fill: 'none' }, ghostGeometry(ctx)))
+
+  // stage 7: elements crossing over the form edge
+  field.push(group({}, scene.front))
+
+  // stage 8: the single accent
+  if (scene.accent) field.push(scene.accent)
+
+  const transform = fieldTransform(plan, w, h)
   const layers: string[] = []
 
-  // --- stage 1: ground -----------------------------------------------------
+  // stage 1: ground, in screen space so the transform cannot expose bare edges
   if (renderer.mode !== 'canvas') {
     layers.push(el('rect', { x: 0, y: 0, width: w, height: h, fill: p.ground }))
   }
+  layers.push(transform ? el('g', { transform }, field.join('')) : field.join(''))
 
-  // --- stage 2: far field, outside the focal form --------------------------
-  layers.push(group({ 'clip-path': `url(#${uid}-out)` }, scene.back))
-
-  // --- stage 3: elements passing behind the focal form ---------------------
-  layers.push(group({}, scene.behind))
-
-  // --- stage 4: the focal form, with a misregistered outline ---------------
-  if (renderer.mode !== 'canvas') {
-    const off = ctx.u(2.6)
-    layers.push(
-      el('path', { d: focal.path, fill: mixHex(p.ground, p.ramp[0], 0.55) }) +
-        el('path', {
-          d: focal.path,
-          fill: 'none',
-          stroke: withAlpha(ctx.ramp(0.7), 0.55),
-          'stroke-width': ctx.u(1.6),
-          transform: `translate(${f(off * ctx.light.dx)} ${f(-off * ctx.light.dy)})`,
-        }),
-    )
-  }
-
-  // --- stage 5: the field at full density, clipped to the form -------------
-  layers.push(group({ 'clip-path': `url(#${uid}-in)` }, scene.subject))
-
-  // --- stage 6: ghost geometry ---------------------------------------------
-  layers.push(group({ fill: 'none' }, ghostGeometry(ctx)))
-
-  // --- stage 7: elements crossing over the form edge -----------------------
-  layers.push(group({}, scene.front))
-
-  // --- stage 8: the single accent ------------------------------------------
-  if (scene.accent) layers.push(scene.accent)
-
-  // --- stage 9: vignette ---------------------------------------------------
+  // stage 9 and 10: vignette and grain, screen space and never rotated
   layers.push(el('rect', { x: 0, y: 0, width: w, height: h, fill: `url(#${uid}-vig)` }))
-
-  // --- stage 10: grain -----------------------------------------------------
   layers.push(el('rect', {
     x: 0, y: 0, width: w, height: h,
     fill: `url(#${uid}-grain)`,
-    opacity: p.mode === 'dark' ? 0.1 : 0.075,
+    opacity: ((p.mode === 'light' ? 0.075 : 0.1) * character.grain).toFixed(3),
     style: 'mix-blend-mode:overlay',
   }))
 

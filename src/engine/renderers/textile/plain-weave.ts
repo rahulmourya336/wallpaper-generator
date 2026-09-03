@@ -149,7 +149,6 @@ export const plainWeave: Renderer = {
   name: 'Plain Weave',
   family: 'textile',
   dark: true,
-  palettes: ['basalt', 'ember', 'verdigris', 'graphite', 'dune', 'bone'],
   focals: ['circle', 'diamond', 'ellipse', 'arch'],
   sampler: 'grid',
   schema,

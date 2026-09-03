@@ -47,7 +47,7 @@ function render(ctx: RenderContext): Scene {
     queue.push({
       // biased toward the focal centre so the colony grows into the mask
       x: lerp(-w * 0.05, w * 1.05, (i + skel.range(0.2, 0.8)) / seeds) * 0.45 + focal.cx * 0.55,
-      y: h + u(12),
+      y: ctx.baseline + u(12),
       a: -Math.PI / 2 + skel.range(-0.4, 0.4),
       w: startW * skel.range(0.7, 1.3),
       life: 0,
@@ -147,7 +147,6 @@ export const coralGrowth: Renderer = {
   name: 'Coral Growth',
   family: 'cellular',
   dark: true,
-  palettes: ['verdigris', 'basalt', 'plum', 'ember', 'indigo', 'bone'],
   focals: ['arch', 'circle', 'ellipse', 'diamond'],
   sampler: 'field',
   schema,

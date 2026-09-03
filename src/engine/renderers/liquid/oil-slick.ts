@@ -124,7 +124,6 @@ export const oilSlick: Renderer = {
   name: 'Oil Slick',
   family: 'liquid',
   dark: true,
-  palettes: ['basalt', 'indigo', 'plum', 'verdigris', 'graphite'],
   focals: ['ellipse', 'circle', 'diamond'],
   sampler: 'field',
   schema,

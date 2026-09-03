@@ -97,7 +97,7 @@ function render(ctx: RenderContext): Scene {
     const t = i / bands
     subject.push(el('path', {
       d: circlePath(cx, cy, R * (1 - t * 0.14)),
-      fill: ctx.ramp(0.06 + 0.16 * (1 - t)),
+      fill: ctx.ramp(0.16 + 0.3 * (1 - t)),
       opacity: 0.55,
     }))
   }
@@ -126,7 +126,6 @@ export const eclipseRings: Renderer = {
   name: 'Eclipse Rings',
   family: 'cosmic',
   dark: true,
-  palettes: ['basalt', 'indigo', 'plum', 'graphite', 'ember'],
   focals: ['disc', 'circle'],
   sampler: 'field',
   schema,

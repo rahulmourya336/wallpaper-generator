@@ -42,10 +42,13 @@ function compositionKey(req: CompositionRequest): string {
  * stepping back through shuffles with the browser's back button, and reopening
  * the export dialog all hit the cache instead of recomposing.
  *
- * The cap is deliberately low. A main-canvas result carries tens of kilobytes
- * of SVG source, and holding a long tail of them costs more than it saves.
+ * Sized to hold the whole browse tray plus the canvas and the export previews.
+ * Thumbnails are small; only the main-canvas entries carry real weight, and
+ * there are only ever a handful of those in flight.
  */
-const CACHE_LIMIT = 24
+// The browse tray alone holds twenty-odd cells; at 24 the cache thrashed and
+// every seed change recomposed the whole tray from scratch.
+const CACHE_LIMIT = 72
 const cache = new Map<string, ComposeResult>()
 
 export function renderComposition(req: CompositionRequest): ComposeResult {
