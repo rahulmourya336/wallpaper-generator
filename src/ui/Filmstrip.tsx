@@ -1,6 +1,6 @@
 import { memo, useEffect, useMemo, useRef } from 'react'
 import { filmstripStyles } from '../engine/registry'
-import { presetOr } from '../export/presets'
+import { resolveSize } from '../export/presets'
 import { actions, useStudio } from '../state/useStudio'
 import { renderComposition } from './useComposition'
 import type { Renderer } from '../engine/types'
@@ -89,7 +89,7 @@ const Thumb = memo(function Thumb({ renderer, seed, paletteId, params, aspect }:
 
 export function Filmstrip(): React.JSX.Element {
   const state = useStudio()
-  const preset = presetOr(state.exportPreset)
+  const preset = resolveSize(state.exportPreset)
   const aspect = preset.width / preset.height
   const styles = useMemo(() => filmstripStyles(state.styleId, COUNT), [state.styleId])
 

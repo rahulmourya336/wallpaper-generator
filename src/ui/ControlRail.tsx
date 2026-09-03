@@ -1,7 +1,7 @@
 import { resolveParams } from '../engine/compositor'
 import { PALETTES } from '../engine/palette'
 import { FAMILIES, getFamily, rendererOr } from '../engine/registry'
-import { groupedPresets, presetOr } from '../export/presets'
+import { groupedPresets, resolveSize } from '../export/presets'
 import { AUTO_PALETTE, actions, useStudio } from '../state/useStudio'
 import type { ParamSpec } from '../engine/types'
 
@@ -123,7 +123,7 @@ export function ControlRail(): React.JSX.Element {
           <label className="control__head" htmlFor="preset">
             <span>Canvas ratio</span>
             <output htmlFor="preset">
-              {presetOr(state.exportPreset).width}&times;{presetOr(state.exportPreset).height}
+              {resolveSize(state.exportPreset).width}&times;{resolveSize(state.exportPreset).height}
             </output>
           </label>
           <select

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef } from 'react'
-import { presetOr } from '../export/presets'
+import { resolveSize } from '../export/presets'
 import { rendererOr } from '../engine/registry'
 import { useStudio } from '../state/useStudio'
 import { PREVIEW_MAX_SHORT, fitAspect, useDebouncedComposition } from './useComposition'
@@ -8,7 +8,7 @@ import { useElementSize } from './useElementSize'
 export function Canvas(): React.JSX.Element {
   const state = useStudio()
   const [boxRef, box] = useElementSize<HTMLDivElement>()
-  const preset = presetOr(state.exportPreset)
+  const preset = resolveSize(state.exportPreset)
   const renderer = rendererOr(state.styleId)
   const aspect = preset.width / preset.height
 

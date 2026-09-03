@@ -2,7 +2,7 @@ import { useSyncExternalStore } from 'react'
 import { rendererOr, familyOf, DEFAULT_STYLE_ID } from '../engine/registry'
 import { resolveParams } from '../engine/compositor'
 import { SEED_ALPHABET, SEED_LENGTH, isValidSeed } from '../engine/rng'
-import { DEFAULT_PRESET_ID, getPreset } from '../export/presets'
+import { DEFAULT_PRESET_ID, resolveSize } from '../export/presets'
 import type { ParamSchema } from '../engine/types'
 
 export type StudioState = {
@@ -96,7 +96,7 @@ function decodeHash(hash: string): Partial<StudioState> {
   out.seedLocked = q.get('l') === '1'
   out.focusMode = q.get('f') === '1'
   const preset = q.get('e')
-  if (preset && getPreset(preset)) out.exportPreset = preset
+  if (preset && resolveSize(preset).id === preset) out.exportPreset = preset
 
   const params: Record<string, number | string> = {}
   for (const [key, value] of q.entries()) {

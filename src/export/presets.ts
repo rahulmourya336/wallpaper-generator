@@ -42,3 +42,73 @@ export function groupedPresets(): ReadonlyArray<[DevicePreset['group'], DevicePr
   const groups: DevicePreset['group'][] = ['Phone', 'Tablet', 'Desktop']
   return groups.map((g) => [g, PRESETS.filter((p) => p.group === g)])
 }
+
+/**
+ * A custom size is encoded into the preset id as `custom:WxH`, so it round
+ * trips through the URL hash without adding a field to the state model.
+ */
+export const CUSTOM_PREFIX = 'custom:'
+
+export type ResolvedSize = { id: string; label: string; width: number; height: number; custom: boolean }
+
+export function makeCustomId(width: number, height: number): string {
+  return `${CUSTOM_PREFIX}${Math.round(width)}x${Math.round(height)}`
+}
+
+export function resolveSize(id: string): ResolvedSize {
+  if (id.startsWith(CUSTOM_PREFIX)) {
+    const m = /^custom:(\d{1,5})x(\d{1,5})$/.exec(id)
+    if (m) {
+      const width = Number(m[1])
+      const height = Number(m[2])
+      if (width >= 16 && height >= 16) {
+        return { id, label: `Custom ${width}×${height}`, width, height, custom: true }
+      }
+    }
+  }
+  const preset = presetOr(id)
+  return { id: preset.id, label: preset.label, width: preset.width, height: preset.height, custom: false }
+}
+
+/**
+ * Bands of the screen that the OS covers on a lock or home screen. Fractions of
+ * the height, measured from the top. The point is not precision — it is showing
+ * the user which part of their composition the clock is going to sit on.
+ */
+export type SafeZone = { from: number; to: number; label: string }
+
+export function safeZones(group: DevicePreset['group']): readonly SafeZone[] {
+  if (group === 'Desktop') {
+    return [
+      { from: 0, to: 0.045, label: 'Menu bar' },
+      { from: 0.9, to: 1, label: 'Dock' },
+    ]
+  }
+  if (group === 'Tablet') {
+    return [
+      { from: 0, to: 0.06, label: 'Status' },
+      { from: 0.08, to: 0.24, label: 'Clock' },
+      { from: 0.92, to: 1, label: 'Dock' },
+    ]
+  }
+  return [
+    { from: 0, to: 0.055, label: 'Status' },
+    { from: 0.1, to: 0.3, label: 'Clock' },
+    { from: 0.88, to: 1, label: 'Controls' },
+  ]
+}
+
+/** Which group a bare width/height most resembles, for the safe-zone overlay. */
+export function groupForRatio(width: number, height: number): DevicePreset['group'] {
+  const aspect = width / height
+  if (aspect >= 1.2) return 'Desktop'
+  if (aspect >= 0.66) return 'Tablet'
+  return 'Phone'
+}
+
+/** The three ratios the export dialog previews side by side. */
+export const PREVIEW_RATIOS: ReadonlyArray<{ id: string; label: string; width: number; height: number }> = [
+  { id: 'phone', label: 'Phone', width: 1179, height: 2556 },
+  { id: 'tablet', label: 'Tablet', width: 1640, height: 2360 },
+  { id: 'desktop', label: 'Desktop', width: 2560, height: 1440 },
+]

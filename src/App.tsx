@@ -1,9 +1,13 @@
+import { useState } from 'react'
 import { Canvas } from './ui/Canvas'
 import { ControlRail } from './ui/ControlRail'
+import { ExportDialog } from './ui/ExportDialog'
 import { Filmstrip } from './ui/Filmstrip'
 import { StagePills } from './ui/StagePills'
 
 export function App(): React.JSX.Element {
+  const [exporting, setExporting] = useState(false)
+
   return (
     <div className="app">
       <header className="topbar">
@@ -17,12 +21,14 @@ export function App(): React.JSX.Element {
         <section className="stage" aria-label="Wallpaper preview">
           <div className="stage__canvas">
             <Canvas />
-            <StagePills />
+            <StagePills onExport={() => setExporting(true)} />
           </div>
           <Filmstrip />
         </section>
         <ControlRail />
       </main>
+
+      <ExportDialog open={exporting} onClose={() => setExporting(false)} />
     </div>
   )
 }

@@ -20,7 +20,17 @@ function LockIcon({ locked }: { locked: boolean }): React.JSX.Element {
   )
 }
 
-export function StagePills(): React.JSX.Element {
+function ExportIcon(): React.JSX.Element {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <path d="M12 3.5v11" />
+      <path d="m7.5 10 4.5 4.5 4.5-4.5" />
+      <path d="M4.5 19.5h15" />
+    </svg>
+  )
+}
+
+export function StagePills({ onExport }: { onExport: () => void }): React.JSX.Element {
   const state = useStudio()
   const lockLabel = state.seedLocked
     ? 'Seed locked. Shuffle will re-roll the parameters. Click to unlock.'
@@ -47,6 +57,15 @@ export function StagePills(): React.JSX.Element {
           title={lockLabel}
         >
           <LockIcon locked={state.seedLocked} />
+        </button>
+        <button
+          type="button"
+          className="pill__btn pill__btn--icon"
+          onClick={onExport}
+          aria-label="Open the export dialog"
+          title="Export"
+        >
+          <ExportIcon />
         </button>
       </div>
 
