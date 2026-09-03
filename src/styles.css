@@ -486,6 +486,21 @@ input[type='number'] {
 
 .app--mobile .stage__row { gap: 0.5rem; }
 
+/**
+ * Lift the action bar clear of the sheet.
+ *
+ * The bar is absolutely positioned against the bottom of the stage, and on
+ * mobile the stage is inset:0 over the whole studio — so it anchors to the
+ * very bottom of the screen, underneath the sheet peeking there. The
+ * padding-bottom above looks like it should prevent that and cannot: padding
+ * does not move an absolutely positioned child that is anchored with `bottom`.
+ * Every control in the bar — back, shuffle, lock, export — was sitting under
+ * the sheet and taking no taps at all.
+ */
+.app--mobile .pill--actions {
+  bottom: calc(var(--peek-h, 5.75rem) + 0.55rem);
+}
+
 .sheet {
   position: absolute;
   left: 0; right: 0; bottom: 0;
