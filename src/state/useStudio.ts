@@ -78,51 +78,45 @@ function encodeHash(s: StudioState): string {
   return q.toString()
 }
 
-function decodeHash(hash: string): Partial<StudioState> {
-  const raw = hash.replace(/^#/, '')
-  if (!raw) return {}
-  const q = new URLSearchParams(raw)
-  const out: Partial<StudioState> = {}
+/**
+ * Decodes a COMPLETE state, filling every field a hash leaves out with its
+ * default. Merging a partial decode over the live state would mean a link
+ * reproduced a different wallpaper depending on whether the visitor arrived
+ * cold or navigated within the session — the whole point of the hash is that
+ * it is the composition, so it has to be authoritative for every field.
+ *
+ * `fallbackSeed` only applies when the hash carries no seed at all.
+ */
+function decodeHash(hash: string, fallbackSeed: string): StudioState {
+  const q = new URLSearchParams(hash.replace(/^#/, ''))
 
   const style = q.get('y')
-  if (style && rendererOr(style).id === style) {
-    out.styleId = style
-    out.categoryId = familyOf(style)
-  }
+  const styleId = style && rendererOr(style).id === style ? style : DEFAULT_STYLE_ID
   const seed = q.get('s')
-  if (seed && isValidSeed(seed)) out.seed = seed
   const palette = q.get('p')
-  if (palette) out.paletteId = palette
-  out.seedLocked = q.get('l') === '1'
-  out.focusMode = q.get('f') === '1'
   const preset = q.get('e')
-  if (preset && resolveSize(preset).id === preset) out.exportPreset = preset
 
   const params: Record<string, number | string> = {}
   for (const [key, value] of q.entries()) {
     if (!key.startsWith('k.')) continue
-    const name = key.slice(2)
     const n = Number(value)
-    params[name] = value !== '' && Number.isFinite(n) ? n : value
+    params[key.slice(2)] = value !== '' && Number.isFinite(n) ? n : value
   }
-  if (Object.keys(params).length) out.params = params
-  return out
+
+  return {
+    styleId,
+    categoryId: familyOf(styleId),
+    seed: seed && isValidSeed(seed) ? seed : fallbackSeed,
+    seedLocked: q.get('l') === '1',
+    paletteId: palette ?? AUTO_PALETTE,
+    params,
+    exportPreset: preset && resolveSize(preset).id === preset ? preset : DEFAULT_PRESET_ID,
+    focusMode: q.get('f') === '1',
+  }
 }
 
 function initialState(): StudioState {
-  const styleId = DEFAULT_STYLE_ID
-  const base: StudioState = {
-    categoryId: familyOf(styleId),
-    styleId,
-    seed: newSeed(),
-    seedLocked: false,
-    paletteId: AUTO_PALETTE,
-    params: {},
-    exportPreset: DEFAULT_PRESET_ID,
-    focusMode: false,
-  }
-  const fromHash = typeof location !== 'undefined' ? decodeHash(location.hash) : {}
-  return { ...base, ...fromHash }
+  return decodeHash(typeof location !== 'undefined' ? location.hash : '', newSeed())
 }
 
 // --- store -----------------------------------------------------------------
@@ -156,7 +150,7 @@ function set(patch: Partial<StudioState>, opts: { push?: boolean } = {}): void {
 if (typeof window !== 'undefined') {
   window.addEventListener('hashchange', () => {
     if (writingHash) return
-    state = { ...state, ...decodeHash(location.hash) }
+    state = decodeHash(location.hash, state.seed)
     emit()
   })
   syncHash(true)

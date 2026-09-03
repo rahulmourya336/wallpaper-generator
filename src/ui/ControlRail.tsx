@@ -44,7 +44,7 @@ function SelectControl({ spec, value }: { spec: Extract<ParamSpec, { type: 'sele
   )
 }
 
-export function ControlRail(): React.JSX.Element {
+export function ControlRail({ id, hidden }: { id?: string; hidden?: boolean } = {}): React.JSX.Element {
   const state = useStudio()
   const renderer = rendererOr(state.styleId)
   const family = getFamily(state.categoryId) ?? FAMILIES[0]
@@ -52,7 +52,7 @@ export function ControlRail(): React.JSX.Element {
   const availablePalettes = PALETTES.filter((p) => renderer.palettes.includes(p.id))
 
   return (
-    <aside className="rail" aria-label="Composition controls">
+    <aside id={id} className="rail" aria-label="Composition controls" hidden={hidden}>
       <div className="rail__section">
         <div className="control">
           <label className="control__head" htmlFor="category">
