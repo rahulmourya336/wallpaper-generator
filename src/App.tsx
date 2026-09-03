@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { BottomSheet } from './ui/BottomSheet'
 import type { Snap } from './ui/BottomSheet'
+import { ArtDirector } from './ui/ArtDirector'
 import { ControlRail } from './ui/ControlRail'
 import { ExportDialog } from './ui/ExportDialog'
 import { Stage } from './ui/Stage'
@@ -32,6 +33,7 @@ export function App(): React.JSX.Element {
   const state = useStudio()
   const isMobile = useMediaQuery(MOBILE_QUERY)
   const [exporting, setExporting] = useState(false)
+  const [directing, setDirecting] = useState(false)
   const [snap, setSnap] = useState<Snap>('peek')
 
   const renderer = rendererOr(state.styleId)
@@ -52,6 +54,13 @@ export function App(): React.JSX.Element {
           <span className="topbar__sep" aria-hidden="true" />
           <span className="topbar__crumb--strong">{renderer.name}</span>
         </p>
+        <button
+          type="button"
+          className="topbar__action"
+          onClick={() => setDirecting(true)}
+        >
+          Art direction
+        </button>
       </header>
 
       <main className={`studio${state.focusMode && !isMobile ? ' studio--focus' : ''}`}>
@@ -85,6 +94,7 @@ export function App(): React.JSX.Element {
       </main>
 
       <ExportDialog open={exporting} onClose={() => setExporting(false)} />
+      <ArtDirector open={directing} onClose={() => setDirecting(false)} />
     </div>
   )
 }
