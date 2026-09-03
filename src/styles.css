@@ -257,6 +257,16 @@ body { margin: 0; background: var(--bg); color: var(--text); }
 .pill__btn--icon:hover { color: var(--text); background: var(--surface-3); }
 .pill__btn--icon.is-active { color: var(--art-accent); background: #ffffff12; }
 
+/* Kept in the row rather than hidden when there is nothing to go back to: a
+   control that appears after the first shuffle moves the two buttons beside
+   it, and the one being moved is the one under the user's finger. */
+.pill__btn:disabled {
+  color: var(--text-faint);
+  background: transparent;
+  cursor: default;
+  opacity: 0.45;
+}
+
 /* --- rail ----------------------------------------------------------------- */
 
 .rail {

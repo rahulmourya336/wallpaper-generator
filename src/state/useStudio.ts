@@ -119,6 +119,119 @@ function initialState(): StudioState {
   return decodeHash(typeof location !== 'undefined' ? location.hash : '', newSeed())
 }
 
+// --- design history --------------------------------------------------------
+
+/**
+ * A stack of designs the user has moved on from.
+ *
+ * The browser back button already steps through these, because every discrete
+ * design change pushes a hash entry. It is not enough on its own: on a phone,
+ * back is a system gesture that people expect to leave the site, and nobody
+ * discovers that a generative toy is browser-navigable. So there is an
+ * explicit control, and because someone who shuffles past a design they liked
+ * has usually closed the tab before they notice, the stack outlives the
+ * session in localStorage.
+ *
+ * Only the fields that make the picture are kept. Restoring focus mode or the
+ * export preset alongside them would mean the button silently rearranged the
+ * interface as well, which is not what "go back" is asking for.
+ */
+export type DesignSnapshot = Pick<
+  StudioState,
+  'categoryId' | 'styleId' | 'seed' | 'seedLocked' | 'paletteId' | 'params'
+>
+
+const HISTORY_KEY = 'wallpaper-studio:history:1'
+const HISTORY_LIMIT = 24
+
+function snapshot(s: StudioState): DesignSnapshot {
+  return {
+    categoryId: s.categoryId,
+    styleId: s.styleId,
+    seed: s.seed,
+    seedLocked: s.seedLocked,
+    paletteId: s.paletteId,
+    params: { ...s.params },
+  }
+}
+
+/**
+ * A stored design can name a style that no longer exists — the catalogue has
+ * had entries retired before and will again. Dropping those on the way in
+ * keeps the button from ever landing someone on the fallback style with no
+ * explanation.
+ */
+function validSnapshot(v: unknown): DesignSnapshot | null {
+  if (!v || typeof v !== 'object') return null
+  const o = v as Record<string, unknown>
+  if (typeof o['styleId'] !== 'string' || rendererOr(o['styleId']).id !== o['styleId']) return null
+  if (typeof o['seed'] !== 'string' || !isValidSeed(o['seed'])) return null
+  const params: Record<string, number | string> = {}
+  const raw = o['params']
+  if (raw && typeof raw === 'object') {
+    for (const [k, val] of Object.entries(raw as Record<string, unknown>)) {
+      if (typeof val === 'number' || typeof val === 'string') params[k] = val
+    }
+  }
+  return {
+    styleId: o['styleId'],
+    categoryId: familyOf(o['styleId']),
+    seed: o['seed'],
+    seedLocked: o['seedLocked'] === true,
+    paletteId: typeof o['paletteId'] === 'string' ? o['paletteId'] : AUTO_PALETTE,
+    params,
+  }
+}
+
+// Storage can throw outright, not just come back empty: Safari in private
+// mode and a browser set to block site data both raise on access.
+function loadHistory(): DesignSnapshot[] {
+  if (typeof localStorage === 'undefined') return []
+  try {
+    const raw = localStorage.getItem(HISTORY_KEY)
+    if (!raw) return []
+    const parsed: unknown = JSON.parse(raw)
+    if (!Array.isArray(parsed)) return []
+    return parsed
+      .map(validSnapshot)
+      .filter((x): x is DesignSnapshot => x !== null)
+      .slice(-HISTORY_LIMIT)
+  } catch {
+    return []
+  }
+}
+
+function saveHistory(): void {
+  if (typeof localStorage === 'undefined') return
+  try {
+    localStorage.setItem(HISTORY_KEY, JSON.stringify(past))
+  } catch {
+    // out of quota or blocked; the in-memory stack still works this session
+  }
+}
+
+let past: DesignSnapshot[] = []
+
+/** Record where we are, before moving somewhere else. */
+function remember(): void {
+  const here = snapshot(state)
+  const top = past[past.length - 1]
+  // Guard against a no-op filling the stack: picking the candidate you are
+  // already on, or shuffling onto the same seed, should not cost a step back.
+  if (top && top.styleId === here.styleId && top.seed === here.seed) return
+  past.push(here)
+  if (past.length > HISTORY_LIMIT) past.shift()
+  saveHistory()
+}
+
+export function canGoBack(): boolean {
+  return past.length > 0
+}
+
+export function useCanGoBack(): boolean {
+  return useSyncExternalStore(subscribe, canGoBack, () => false)
+}
+
 // --- store -----------------------------------------------------------------
 
 let state: StudioState = initialState()
@@ -187,6 +300,7 @@ function set(patch: Partial<StudioState>, opts: { push?: boolean } = {}): void {
 }
 
 if (typeof window !== 'undefined') {
+  past = loadHistory()
   window.addEventListener('hashchange', () => {
     if (writingHash) return
     // an incoming navigation wins: a queued write is stale by definition, and
@@ -224,6 +338,7 @@ export const actions = {
    * catalogue. Locked: the composition holds and the tuning is re-rolled.
    */
   shuffle(): void {
+    remember()
     if (state.seedLocked) {
       set({ params: randomizeParams(rendererOr(state.styleId).schema) }, { push: true })
       return
@@ -249,6 +364,8 @@ export const actions = {
   /** Same seed, same params, different style. The filmstrip's whole purpose. */
   setStyle(styleId: string): void {
     const r = rendererOr(styleId)
+    if (r.id === state.styleId) return
+    remember()
     set({ styleId: r.id, categoryId: familyOf(r.id) }, { push: true })
   },
 
@@ -257,8 +374,11 @@ export const actions = {
     set({ categoryId })
   },
 
+  /** Choosing one of the candidates on the stage. */
   setSeed(seed: string): void {
-    if (isValidSeed(seed)) set({ seed })
+    if (!isValidSeed(seed) || seed === state.seed) return
+    remember()
+    set({ seed }, { push: true })
   },
 
   toggleLock(): void {
@@ -283,5 +403,24 @@ export const actions = {
 
   setFocusMode(focusMode: boolean): void {
     set({ focusMode })
+  },
+
+  /**
+   * Step back to the design before the last one.
+   *
+   * Pushed rather than replaced, so the browser's own forward button becomes
+   * the redo nobody has to be told about.
+   */
+  back(): void {
+    const prev = past.pop()
+    if (!prev) return
+    saveHistory()
+    set(prev, { push: true })
+  },
+
+  clearHistory(): void {
+    past = []
+    saveHistory()
+    emit()
   },
 }
