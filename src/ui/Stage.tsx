@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
 import { rendererOr } from '../engine/registry'
-import { makeRng, seedFrom } from '../engine/rng'
 import { resolveSize } from '../export/presets'
 import { actions, useStudio } from '../state/useStudio'
 import { CompositionView } from './CompositionView'
 import { Lightbox } from './Lightbox'
 import { PREVIEW_MAX_SHORT, fitAspect, useDebouncedComposition } from './useComposition'
+import { useCandidates } from './useCandidates'
 import { useElementSize } from './useElementSize'
 
 /**
@@ -15,9 +15,11 @@ import { useElementSize } from './useElementSize'
  * not whether the single generated result happened to land. Three side by side
  * answers that at a glance, and replaces the browse tray that used to sit
  * under the canvas doing the same job less directly.
+ *
+ * This is the desktop arrangement. A phone has neither the width to put three
+ * compositions side by side nor the headroom to keep three vector previews
+ * live, so it gets its own stage — see MobileStage.
  */
-
-const COUNT = 3
 
 type Size = { width: number; height: number }
 
@@ -65,7 +67,7 @@ function Candidate({
     const root = document.documentElement
     root.style.setProperty('--art-accent', result.palette.accent)
     root.style.setProperty('--art-ground', result.palette.ground)
-    root.style.setProperty('--art-ramp', result.palette.ramp[3])
+    root.style.setProperty('--art-ramp', result.palette.ramp[3] as string)
   }, [selected, result])
 
   const label = `${renderer.name}, seed ${seed}`
@@ -90,35 +92,13 @@ function Candidate({
   )
 }
 
-/** Alternates derived from the selected seed, so a shared link reproduces the set. */
-function setAround(seed: string): string[] {
-  const rng = makeRng(seed, 'alternates')
-  return [seed, ...Array.from({ length: COUNT - 1 }, () => seedFrom(rng))]
-}
-
-export function Stage({
-  solo = false,
-  onExport,
-}: {
-  solo?: boolean
-  onExport?: () => void
-} = {}): React.JSX.Element {
+export function Stage({ onExport }: { onExport?: () => void } = {}): React.JSX.Element {
   const state = useStudio()
   const [rowRef, row] = useElementSize<HTMLDivElement>()
-  const [candidates, setCandidates] = useState(() => setAround(state.seed))
+  const candidates = useCandidates()
   const [zoomed, setZoomed] = useState(false)
   const preset = resolveSize(state.exportPreset)
   const aspect = preset.width / preset.height
-
-  /**
-   * Picking a candidate must not reshuffle the others: the one you were
-   * comparing against would vanish the moment you chose. So the set is rebuilt
-   * only when the selected seed arrives from outside it, which is a shuffle, a
-   * restyle, or landing on a link.
-   */
-  useEffect(() => {
-    setCandidates((prev) => (prev.includes(state.seed) ? prev : setAround(state.seed)))
-  }, [state.seed])
 
   /**
    * One size for the whole row, measured once.
@@ -127,28 +107,18 @@ export function Stage({
    * flex layout, which comes from the cells — and the three came out different
    * heights depending on which resolved first.
    */
-  /**
-   * With the controls open there is only one composition worth showing.
-   *
-   * Three candidates share the width, so once the sheet has taken half the
-   * height each one is a postage stamp — and the one being tuned is the only
-   * one changing. Dropping to the selected seed alone gives it the whole row,
-   * which is the difference between watching a slider work and guessing at it.
-   */
-  const shown = solo ? [state.seed] : candidates
-
   const gap = 20
   const cell = useMemo(() => {
     if (row.width < 2 || row.height < 2) return { width: 0, height: 0 }
-    const n = Math.max(1, shown.length)
+    const n = Math.max(1, candidates.length)
     const each = (row.width - gap * (n - 1)) / n
     return fitAspect({ width: each, height: row.height }, aspect)
-  }, [row, aspect, shown.length])
+  }, [row, aspect, candidates.length])
 
   return (
-    <div className={`stage__row${solo ? ' stage__row--solo' : ''}`} ref={rowRef} style={{ gap }}>
+    <div className="stage__row" ref={rowRef} style={{ gap }}>
       {cell.width > 1
-        ? shown.map((seed, i) => (
+        ? candidates.map((seed, i) => (
             <Candidate
               key={seed}
               seed={seed}

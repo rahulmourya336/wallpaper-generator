@@ -89,6 +89,83 @@ export function renderComposition(req: CompositionRequest): ComposeResult {
  */
 export const PREVIEW_MAX_SHORT = 1100
 
+/**
+ * Short-edge target for a preview that is going to be flattened to a bitmap.
+ *
+ * A vector preview is resolution independent — the browser draws it at whatever
+ * the device has — so 1100 is only ever a sampling density there. A bitmap has
+ * to carry its own resolution, and a phone at three device pixels per CSS pixel
+ * will show every one of them, so the flattened path sizes itself against the
+ * screen instead of a constant.
+ *
+ * Two things stop that becoming its own problem. The ratio is capped well below
+ * a modern phone's, because past about two and a half the difference stops
+ * being visible on a photograph-like image and only costs memory. And the
+ * answer is quantised, because it feeds a cache key: an address bar sliding
+ * away changes the viewport by a few pixels, and without the step every one of
+ * those would recompose the whole deck.
+ */
+const RASTER_STEP = 160
+
+/**
+ * And a ceiling on the buffer, not just on the edge.
+ *
+ * A short edge alone says nothing about how much memory a composition costs: a
+ * modern phone preset is well over two to one, so the short edge that looks
+ * modest produces a buffer twice the size you would guess. Bounding the area is
+ * what keeps a handful of live rasters inside a phone's budget whatever shape
+ * of screen is being exported for.
+ */
+const RASTER_MAX_PIXELS = 1_900_000
+
+/**
+ * And a much tighter one where the picture is computed per pixel.
+ *
+ * The two backends want opposite things from resolution. A vector family draws
+ * hairlines, so pixels are what stop it going soft, and they cost nothing to
+ * add — the SVG is the same size whatever it is rasterised into. The post
+ * pipeline is the other way round: it allocates a stack of full-frame buffers
+ * and blurs them, so its cost is the pixel count, and its output — lit, soft,
+ * gradient-heavy — is the kind of image that upscales without anyone noticing.
+ *
+ * Measured on the one family that runs through it, paint time goes 574ms at
+ * nineteen hundred thousand pixels to 206ms at six hundred thousand, and stops
+ * improving below about four hundred thousand — there is a fixed cost in the
+ * blur passes that no amount of shrinking removes. This sits just above that
+ * knee. It matters more than the ratio suggests, because that family is the
+ * default style: three of these paint on every cold load.
+ */
+const PER_PIXEL_MAX_SHORT = 620
+
+export function rasterShortEdge(aspect = 1, perPixel = false): number {
+  if (typeof window === 'undefined') return PREVIEW_MAX_SHORT
+  const css = Math.min(window.innerWidth, window.innerHeight)
+  const want = css * Math.min(window.devicePixelRatio || 1, 2.5)
+  const stepped = Math.max(900, Math.min(1600, Math.ceil(want / RASTER_STEP) * RASTER_STEP))
+
+  // short * (short * ratio-of-long-to-short) is the area; solve it for short
+  const longOverShort = aspect > 1 ? aspect : 1 / aspect
+  const byArea = Math.sqrt(RASTER_MAX_PIXELS / (longOverShort > 0 ? longOverShort : 1))
+  const cap = perPixel ? Math.min(PER_PIXEL_MAX_SHORT, stepped) : stepped
+  return Math.max(480, Math.min(cap, Math.floor(byArea)))
+}
+
+/** The same, kept current across rotation and address-bar changes. */
+export function useRasterShortEdge(aspect: number, perPixel: boolean): number {
+  const [edge, setEdge] = useState(() => rasterShortEdge(aspect, perPixel))
+  useEffect(() => {
+    const onResize = () => setEdge(rasterShortEdge(aspect, perPixel))
+    onResize()
+    window.addEventListener('resize', onResize, { passive: true })
+    window.addEventListener('orientationchange', onResize)
+    return () => {
+      window.removeEventListener('resize', onResize)
+      window.removeEventListener('orientationchange', onResize)
+    }
+  }, [aspect, perPixel])
+  return edge
+}
+
 /** Fit a target aspect ratio inside a measured box. */
 export function fitAspect(
   box: { width: number; height: number },

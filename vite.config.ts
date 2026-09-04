@@ -76,10 +76,51 @@ function assetWriter(): Plugin {
   }
 }
 
+/**
+ * Inline the stylesheet instead of linking it.
+ *
+ * A linked stylesheet blocks the first paint on a second round trip, and on a
+ * phone connection that round trip is most of the wait before anything appears.
+ * The whole sheet is under twenty kilobytes and four gzipped, which is smaller
+ * than the request that fetches it is worth — so it goes in the document and
+ * the page paints from one response.
+ *
+ * The trade is that the CSS stops being cached separately from the HTML, so a
+ * style-only change re-downloads the document. For a single-page app whose
+ * document is three kilobytes that is not a trade worth protecting.
+ */
+function inlineCss(): Plugin {
+  return {
+    name: 'inline-css',
+    apply: 'build',
+    enforce: 'post',
+    generateBundle(_options, bundle) {
+      const html = Object.values(bundle).find(
+        (c) => c.type === 'asset' && c.fileName.endsWith('.html'),
+      )
+      if (!html || html.type !== 'asset' || typeof html.source !== 'string') return
+
+      let source = html.source
+      for (const chunk of Object.values(bundle)) {
+        if (chunk.type !== 'asset' || !chunk.fileName.endsWith('.css')) continue
+        const css = typeof chunk.source === 'string' ? chunk.source : null
+        if (css === null) continue
+        const link = new RegExp(
+          `<link[^>]+href="[^"]*${chunk.fileName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}"[^>]*>`,
+        )
+        if (!link.test(source)) continue
+        source = source.replace(link, `<style>${css}</style>`)
+        delete bundle[chunk.fileName]
+      }
+      html.source = source
+    },
+  }
+}
+
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), 'VITE_')
   return {
-    plugins: [react(), seoFiles(env['VITE_SITE_URL'] ?? ''), assetWriter()],
+    plugins: [react(), seoFiles(env['VITE_SITE_URL'] ?? ''), assetWriter(), inlineCss()],
     build: { target: 'es2022', assetsInlineLimit: 0 },
   }
 })

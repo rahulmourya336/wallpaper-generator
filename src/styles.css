@@ -476,46 +476,166 @@ input[type='number'] {
 
 /* --- mobile --------------------------------------------------------------- */
 
-.app--mobile .studio { display: block; }
-
 /**
- * The stage reserves whatever the sheet is currently showing.
+ * One rule governs this whole section: while a finger is down, nothing may
+ * change that costs layout.
  *
- * Fixed to the peek height, opening the controls buried the composition they
- * change, so tuning a slider meant dragging blind and then collapsing the
- * sheet to see the result. Following the sheet instead means the picture is
- * always on screen — it just gets smaller as the controls get taller.
- *
- * The variable only updates when the sheet settles, never mid-drag: the stage
- * re-measures and recomposes on resize, and doing that per pointer move would
- * stall the drag. The transition covers the gap.
+ * The phone build used to animate the stage's padding to make room for the
+ * sheet. Padding is layout, layout re-runs the flex solve and re-lays out the
+ * composition inside it, and a composition is thousands of nodes — so the
+ * browser spent every frame of every drag doing arithmetic about boxes instead
+ * of moving the one the user was dragging. Everything below moves on transforms
+ * and opacity only, and the compositions are flattened to bitmaps before they
+ * get here, so a drag is three layers being repositioned and nothing else.
  */
-.app--mobile .stage {
+
+.app--mobile { height: 100dvh; overflow: hidden; }
+.app--mobile .studio { display: block; position: relative; }
+
+/* --- mobile stage: one composition, the alternates a swipe away ------------ */
+
+.mstage {
   position: absolute;
   inset: 0;
-  padding-bottom: calc(var(--sheet-h, 5.75rem) + 3.75rem);
-  transition: padding-bottom 240ms cubic-bezier(.22,.68,.24,1);
+  overflow: hidden;
 }
 
-.app--mobile .stage__row--solo { justify-content: center; }
+/**
+ * The lift.
+ *
+ * The picture has to stay clear of the action bar and whatever the sheet is
+ * showing, and it gets there by shrinking towards the top of the screen rather
+ * than by having its box resized. Scaling about the centre moves the centre by
+ * nothing, so the translate is exactly half the space being given up.
+ *
+ * --deck-k is set from JS because it is a ratio of two heights CSS cannot both
+ * see; everything else here is derived from the sheet's settled height.
+ */
+.mstage__fit {
+  position: absolute;
+  inset: 0;
+  touch-action: pan-y;
+  /**
+   * Clipped here, not on the parent.
+   *
+   * The scale is applied to this box, so the parent's clip is in the wrong
+   * coordinate space: shrinking the deck about its centre pulls the frame after
+   * the current one in from the right, and it appeared as a strip of the next
+   * wallpaper down the edge of the screen. Clipping inside the transform cuts
+   * the deck at its own edges, wherever the transform has put them.
+   */
+  overflow: hidden;
+  transform: translate3d(0, calc((var(--sheet-h, 5.75rem) + var(--bar-h, 60px)) / -2), 0)
+             scale(var(--deck-k, 0.8));
+  transition: transform 260ms cubic-bezier(.22,.68,.24,1);
+  will-change: transform;
+}
 
-.app--mobile .stage__row { gap: 0.5rem; }
+.mstage__deck {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  will-change: transform;
+}
+
+.mframe {
+  position: relative;
+  flex: 0 0 100%;
+  width: 100%; height: 100%;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border-radius: 0.9rem;
+  /**
+   * The frame cannot affect anything outside itself, and nothing outside it can
+   * make it re-measure. That is what keeps a swipe from walking the layout of
+   * the two frames it is sliding past.
+   */
+  contain: strict;
+}
+
+/**
+ * Letterbox rather than stretch. A wallpaper is 9:19.5 and the phone showing it
+ * is whatever it is, so the canvas carries its own aspect and object-fit does
+ * the rest — a canvas can be told this, because its width and height attributes
+ * give it intrinsic dimensions.
+ */
+.mframe .composition__raster {
+  position: absolute;
+  inset: 0;
+  width: 100%; height: 100%;
+  object-fit: contain;
+}
+
+.mstage__dots {
+  position: absolute;
+  left: 50%; translate: -50% 0;
+  bottom: calc(var(--sheet-h, 4rem) + var(--bar-h, 60px) + 1rem);
+  z-index: 4;
+  display: flex; align-items: center;
+  padding: 0 0.2rem;
+  /**
+   * On a chip, because these sit over the work.
+   *
+   * Half the palettes are light, and white dots at a third opacity disappear
+   * into a pale sky — the one control that says there are two more wallpapers
+   * to see was invisible on the wallpapers most likely to make you look for
+   * them.
+   */
+  border-radius: 999px;
+  background: #0b0b10a8;
+  transition: bottom 260ms cubic-bezier(.22,.68,.24,1);
+}
+
+/**
+ * A dot is six pixels across and a fingertip is not.
+ *
+ * The tap target is the button and the dot is a mark drawn inside it, so the
+ * thing you aim at is the full recommended twenty-four square while the thing
+ * you see stays a dot. Shrinking the target to match the graphic is the usual
+ * way this control ends up unusable on the device it exists for.
+ */
+.mstage__dot {
+  position: relative;
+  width: 1.5rem; height: 1.5rem;
+  padding: 0; border: 0; background: none;
+  cursor: pointer;
+}
+
+.mstage__dot::before {
+  content: '';
+  position: absolute;
+  inset: 0; margin: auto;
+  width: 0.4rem; height: 0.4rem;
+  border-radius: 999px;
+  background: #ffffff6b;
+  transition: background 200ms ease, width 200ms ease;
+}
+
+.mstage__dot.is-on::before { width: 1.15rem; background: var(--art-accent, #fff); }
 
 /**
  * Lift the action bar clear of the sheet.
  *
- * The bar is absolutely positioned against the bottom of the stage, and on
- * mobile the stage is inset:0 over the whole studio — so it anchors to the
- * very bottom of the screen, underneath the sheet peeking there. The
- * padding-bottom above looks like it should prevent that and cannot: padding
- * does not move an absolutely positioned child that is anchored with `bottom`.
- * Every control in the bar — back, shuffle, lock, export — was sitting under
- * the sheet and taking no taps at all.
+ * The bar is absolutely positioned against the bottom of the studio, so without
+ * this it anchors to the very bottom of the screen, underneath the sheet
+ * peeking there — every control in it, back, shuffle, lock and export, sitting
+ * under the sheet and taking no taps at all.
  */
 .app--mobile .pill--actions {
   bottom: calc(var(--sheet-h, 5.75rem) + 0.55rem);
-  transition: bottom 240ms cubic-bezier(.22,.68,.24,1);
+  transition: bottom 260ms cubic-bezier(.22,.68,.24,1);
+  /**
+   * Opaque, not blurred. A backdrop filter has to sample everything behind it
+   * on every frame it moves over, and what is behind it here is a full-screen
+   * composition — so the one effect nobody asked for was costing the frame rate
+   * of the gesture it sits on top of.
+   */
+  background: #14141c;
+  backdrop-filter: none;
 }
+
+/* --- the sheet ------------------------------------------------------------ */
 
 .sheet {
   position: absolute;
@@ -525,45 +645,111 @@ input[type='number'] {
   display: flex; flex-direction: column;
   border-top: 1px solid var(--line);
   border-radius: 0.9rem 0.9rem 0 0;
-  background: #101017f2;
-  backdrop-filter: blur(16px);
+  /* opaque for the same reason the action bar is */
+  background: #101017;
   box-shadow: 0 -1rem 2.5rem -1rem #000000cc;
   will-change: transform;
+  /* the sheet is placed by JS; this is only the pre-hydration position */
+  transform: translate3d(0, calc(100% - var(--peek-h, 92px)), 0);
 }
 
+/**
+ * The grip is exactly the peek height.
+ *
+ * The two numbers have to agree or the peek stop shows a slice of whatever
+ * control happens to come first, so this is fixed rather than intrinsic and
+ * PEEK_HEIGHT in the shell is the same figure.
+ */
 .sheet__grip {
   flex: 0 0 auto;
-  padding: 0.4rem 0 0.1rem;
+  height: 4rem;
   touch-action: none;
   display: grid; place-items: center;
 }
 
 .sheet__handle {
-  display: grid; place-items: center;
-  width: 4rem; height: 1.3rem;
-  padding: 0; border: 0; background: none; cursor: grab;
+  display: flex; flex-direction: column; align-items: center; gap: 0.5rem;
+  width: 100%; height: 100%;
+  padding: 0.55rem 0 0; border: 0; background: none; cursor: grab;
+  font: inherit;
 }
 
-.sheet__handle span {
+.sheet__pip {
   display: block;
-  width: 2.5rem; height: 0.22rem;
+  width: 2.5rem; height: 0.25rem;
   border-radius: 999px; background: var(--surface-3);
+  transition: background 200ms ease;
 }
+
+.sheet__title {
+  font-size: 0.72rem;
+  font-weight: 650;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  transition: color 200ms ease;
+}
+
+.sheet--peek .sheet__pip { background: var(--art-accent); }
+.sheet--peek .sheet__title { color: var(--text-dim); }
 
 .sheet__body {
   flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
-  padding: 0 0.9rem 1.5rem;
+  -webkit-overflow-scrolling: touch;
+  padding: 0 0.9rem calc(1.5rem + env(safe-area-inset-bottom));
+  /**
+   * The list keeps the vertical axis, and the sheet takes the gesture back only
+   * when the list has nothing left to give — at the top of its scroll, pulled
+   * further down. Handing the axis to the browser is what makes the scroll
+   * itself smooth; the sheet only intervenes at the boundary.
+   */
+  touch-action: pan-y;
 }
+
+/* At the peek stop there is no list on screen to scroll, so any drag inside the
+   sheet is a drag of the sheet. */
+.sheet--peek .sheet__body { overflow: hidden; touch-action: none; }
 
 .sheet .rail { border-left: 0; background: none; overflow: visible; }
 .sheet .rail__section { padding-inline: 0; }
 
+/**
+ * A phone control is a thumb target before it is a control.
+ *
+ * The rail was drawn for a mouse at arm's length on a desktop, and reused
+ * verbatim it gave a phone 4px slider tracks and 28px rows. These are the same
+ * controls at a size a thumb can actually land on.
+ */
+.sheet .field__label { font-size: 0.8rem; }
+
+/* the handle already says Tune; the rail's own heading only said it twice */
+.sheet .rail__title { display: none; }
+
+/* The slider owns both axes once a thumb is on it, or the page scrolls out
+   from under the value being set. */
+.sheet input[type='range'] { height: 2.25rem; touch-action: none; }
+
+.sheet input[type='range']::-webkit-slider-runnable-track { height: 5px; border-radius: 5px; }
+.sheet input[type='range']::-webkit-slider-thumb {
+  width: 1.4rem; height: 1.4rem;
+  /* half the thumb, less half the track, to sit it on the line */
+  margin-top: -0.55rem;
+}
+.sheet input[type='range']::-moz-range-track { height: 5px; border-radius: 5px; }
+.sheet input[type='range']::-moz-range-thumb { width: 1.4rem; height: 1.4rem; }
+
 @media (max-width: 52rem) {
   .rail-toggle { display: none; }
-  .stage__prompt span { display: none; }
+}
+
+/* The crumb is the first thing to go when the bar runs out of room: it only
+   repeats what the stage already shows. */
+@media (max-width: 34rem) {
+  .topbar { gap: 0.7rem; }
+  .topbar__now { display: none; }
 }
 
 /* --- export dialog -------------------------------------------------------- */
@@ -724,106 +910,6 @@ input[type='number'] {
   }
   .export__body { grid-template-columns: minmax(0, 1fr); max-height: none; }
   .export__crops { overflow-x: auto; }
-}
-
-/* --- art direction -------------------------------------------------------- */
-
-.topbar__action {
-  margin-left: auto;
-  padding: 0.42rem 0.85rem;
-  font: inherit;
-  font-size: 0.7rem;
-  letter-spacing: 0.03em;
-  color: var(--text-dim);
-  background: var(--surface-2);
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  cursor: pointer;
-}
-
-.topbar__action:hover { color: var(--text); border-color: var(--surface-3); }
-
-.art { width: min(64rem, 95vw); }
-.art__body { grid-template-columns: minmax(0, 20rem) minmax(0, 1fr); align-items: start; }
-
-.art__input {
-  width: 100%;
-  padding: 0.48rem 0.6rem;
-  font: inherit;
-  font-size: 0.78rem;
-  color: var(--text);
-  background: var(--surface-2);
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-}
-
-.art__input::placeholder { color: var(--text-faint); }
-
-.art__phrases { display: flex; flex-wrap: wrap; gap: 0.3rem; }
-
-.art__phrase {
-  padding: 0.3rem 0.55rem;
-  font: inherit;
-  font-size: 0.68rem;
-  color: var(--text-dim);
-  background: var(--surface-2);
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  cursor: pointer;
-  text-align: left;
-}
-
-.art__phrase:hover { color: var(--text); border-color: var(--surface-3); }
-
-.art__phrase[aria-pressed='true'] {
-  color: var(--bg);
-  background: var(--art-accent);
-  border-color: transparent;
-}
-
-.art__phrase.is-clash {
-  color: var(--text-faint);
-  background: transparent;
-  border-style: dashed;
-  text-decoration: line-through;
-}
-
-.art__note {
-  margin: 0.1rem 0 0;
-  font-size: 0.66rem;
-  line-height: 1.5;
-  color: var(--text-faint);
-}
-
-.art__out { display: flex; flex-direction: column; gap: 0.8rem; min-width: 0; }
-
-.brief { display: flex; flex-direction: column; gap: 0.35rem; }
-.brief__head { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
-.brief__copy { padding: 0.25rem 0.6rem; font-size: 0.66rem; }
-
-.brief__text {
-  width: 100%;
-  resize: vertical;
-  padding: 0.65rem 0.75rem;
-  font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
-  font-size: 0.72rem;
-  line-height: 1.6;
-  color: var(--text);
-  background: var(--bg);
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-}
-
-@media (max-width: 56rem) {
-  .art__body { grid-template-columns: minmax(0, 1fr); }
-}
-
-/* The crumb is the first thing to go when the bar runs out of room: the action
-   is a control, the crumb only repeats what the stage already shows. */
-@media (max-width: 34rem) {
-  .topbar { gap: 0.7rem; }
-  .topbar__now { display: none; }
-  .topbar__action { margin-left: auto; }
 }
 
 /* --- full screen view ------------------------------------------------------ */

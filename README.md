@@ -40,10 +40,34 @@ src/
     registry.ts     category -> family -> renderer
     renderers/      ten family folders
   export/           rasterizer and device presets
-  ui/               canvas, rail, filmstrip, bottom sheet, export dialog
+  ui/               two stages, rail, bottom sheet, export dialog
   state/            one store, synced to the URL hash
   dev/              contact sheet (dev only)
 ```
+
+### Two stages, one set of candidates
+
+Desktop puts the three candidates side by side; a phone stacks the same three
+into a full-bleed swipe deck, because three compositions across a 390px screen
+are stamps nobody can choose between. Both read the set from `useCandidates`, so
+turning a phone sideways does not swap the alternates out from under you.
+
+The phone path has one rule behind every decision in it: **while a finger is
+down, nothing may change that costs layout.** Drags are written straight onto the
+element rather than through React state, the sheet lifts the deck with a
+transform instead of resizing it, and compositions are flattened to a single
+bitmap before they reach the DOM — a busy vector style is close to four thousand
+SVG nodes, and three of those live at once is a page that re-lays-out on every
+frame of every gesture. What is left for the browser to do during a swipe is move
+three layers.
+
+The flattening cuts both ways on resolution, so the preview size depends on the
+backend. A vector family gets pixels, because hairlines need them and the SVG
+costs the same whatever it is rasterised into. The scene-graph family gets far
+fewer, because the post pipeline allocates full-frame buffers and blurs them, so
+its cost *is* the pixel count — and its output is the lit, soft kind of image
+that upscales without anyone noticing. It is also the default style, so three of
+them paint on every cold load.
 
 ### Determinism
 

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { REDUCED_MOTION_QUERY, useMediaQuery } from './useMediaQuery'
 
 export type Snap = 'peek' | 'half' | 'expanded'
@@ -17,9 +17,31 @@ export type Snap = 'peek' | 'half' | 'expanded'
  * reach the shorter stops, so its content never reflows while dragging — a
  * sheet that animates its own height re-lays out its contents on every pointer
  * move and drops frames on exactly the interaction it exists for.
+ *
+ * Two rules keep the drag honest, and both were learned by breaking them.
+ *
+ * The position is written onto the element, never held in React state. A
+ * pointer move that calls setState re-renders the sheet and the whole control
+ * rail underneath it — twenty-odd inputs, a params resolve and four option
+ * lists — sixty times a second, and none of that work can change anything a
+ * finger is looking at. React owns where the sheet comes to rest; the gesture
+ * owns where it is right now.
+ *
+ * And the scroller is part of the gesture. A sheet whose body scrolls
+ * independently of its position is two controls fighting over one finger: you
+ * pull down meaning "put this away" and the list scrolls instead. Dragging down
+ * from the top of the list moves the sheet, which is the only reading of that
+ * gesture anyone actually intends.
  */
 
 const ORDER: readonly Snap[] = ['peek', 'half', 'expanded']
+
+/** Past this a gesture has declared itself a drag rather than a tap. */
+const AXIS_LOCK = 6
+/** A drag longer than this steps to the next stop regardless of where it ended. */
+const FLICK = 40
+
+const EASE = 'transform 260ms cubic-bezier(.22,.68,.24,1)'
 
 export function BottomSheet({
   snap,
@@ -27,6 +49,7 @@ export function BottomSheet({
   peekHeight,
   onVisibleHeight,
   label,
+  title,
   children,
 }: {
   snap: Snap
@@ -36,28 +59,35 @@ export function BottomSheet({
   /**
    * How much of the sheet is showing at rest, so the stage can keep the
    * composition clear of it. Reported at rest only, never mid-drag: the stage
-   * re-measures and recomposes when it resizes, and doing that on every
-   * pointer move would stall the drag.
+   * lifts on a transform and the transition covers the gap, and reporting per
+   * pointer move would put a React render back on the path of the drag.
    */
   onVisibleHeight?: (px: number) => void
   label: string
+  /**
+   * Shown on the handle, so the peek stop says what is behind it.
+   *
+   * The sheet used to peek by showing the top forty pixels of the control list,
+   * which is a half a select box and the word "Categ". A strip of a control
+   * nobody can use is not a preview of anything; a word is.
+   */
+  title: string
   children: React.ReactNode
 }): React.JSX.Element {
   const ref = useRef<HTMLElement | null>(null)
-  const [drag, setDrag] = useState<{ startY: number; offset: number } | null>(null)
+  const bodyRef = useRef<HTMLDivElement | null>(null)
   const reduced = useMediaQuery(REDUCED_MOTION_QUERY)
 
   /**
-   * Seeded with the peek height rather than zero.
+   * Measured in a layout effect, not a passive one.
    *
-   * The measurement lands in an effect, so on the very first frame the height
-   * is whatever it was initialised to — and a zero there makes `resting` zero,
-   * which is the fully open position. The sheet flashed open on load and then
-   * snapped shut. Starting at the peek height means the first frame is already
-   * the position it is about to settle into.
+   * The resting position is a function of the sheet's own height, so a height
+   * that arrives after paint means the first painted frame is at the wrong
+   * offset — the sheet flashed fully open and then snapped shut. A layout
+   * effect lands the measurement and the transform before the browser draws.
    */
   const [height, setHeight] = useState(peekHeight)
-  useEffect(() => {
+  useLayoutEffect(() => {
     const node = ref.current
     if (!node) return
     const measure = () => setHeight(node.getBoundingClientRect().height)
@@ -77,66 +107,110 @@ export function BottomSheet({
 
   const visible = visibleFor(snap)
   const restingOffset = Math.max(0, height - visible)
-  const offset = drag ? Math.max(0, Math.min(height, restingOffset + drag.offset)) : restingOffset
+
+  const drag = useRef<{
+    id: number
+    y: number
+    /** null until the gesture has committed to moving the sheet */
+    from: number | null
+    fromBody: boolean
+  } | null>(null)
+
+  /** Where React says the sheet belongs, applied straight to the node. */
+  useLayoutEffect(() => {
+    const node = ref.current
+    // a live drag owns the node; React only places it when no finger is down
+    if (!node || (drag.current && drag.current.from !== null)) return
+    node.style.transition = reduced ? 'none' : EASE
+    node.style.transform = `translate3d(0, ${restingOffset}px, 0)`
+  }, [restingOffset, reduced])
 
   useEffect(() => {
     onVisibleHeight?.(visible)
   }, [visible, onVisibleHeight])
 
-  const onPointerDown = useCallback((e: React.PointerEvent) => {
+  const begin = (e: React.PointerEvent, fromBody: boolean) => {
     if (e.button !== 0 && e.pointerType === 'mouse') return
-    // Capture can throw if the pointer is already gone; the drag should still
-    // start, it just will not follow the pointer outside the element.
-    try {
-      ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
-    } catch {
-      /* no capture available */
-    }
-    setDrag({ startY: e.clientY, offset: 0 })
-  }, [])
+    drag.current = { id: e.pointerId, y: e.clientY, from: null, fromBody }
+  }
 
-  const onPointerMove = useCallback(
-    (e: React.PointerEvent) => {
-      if (!drag) return
-      setDrag({ startY: drag.startY, offset: e.clientY - drag.startY })
-    },
-    [drag],
-  )
+  const onPointerMove = (e: React.PointerEvent) => {
+    const d = drag.current
+    const node = ref.current
+    if (!d || !node || e.pointerId !== d.id) return
+    const dy = e.clientY - d.y
 
-  const onPointerUp = useCallback(
-    (e: React.PointerEvent) => {
-      if (!drag) return
-      try {
-        ;(e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId)
-      } catch {
-        /* nothing captured */
-      }
-      const landed = restingOffset + drag.offset
-      setDrag(null)
-
-      // A flick beats position: a short fast drag should still change stop, and
-      // with three stops it moves one step rather than jumping to an end.
-      if (Math.abs(drag.offset) > 40) {
-        const i = ORDER.indexOf(snap)
-        const next = drag.offset > 0 ? Math.max(0, i - 1) : Math.min(ORDER.length - 1, i + 1)
-        onSnapChange(ORDER[next] as Snap)
-        return
-      }
-
-      // otherwise settle on whichever stop the sheet was actually left nearest
-      let best: Snap = snap
-      let bestDist = Infinity
-      for (const s of ORDER) {
-        const d = Math.abs(Math.max(0, height - visibleFor(s)) - landed)
-        if (d < bestDist) {
-          bestDist = d
-          best = s
+    if (d.from === null) {
+      if (Math.abs(dy) < AXIS_LOCK) return
+      /**
+       * From the body, the list gets first refusal. It only loses the gesture
+       * when it has nothing left to give: at the top of its scroll and being
+       * pulled further down, or at the peek stop where there is no list on
+       * screen to scroll in the first place.
+       */
+      if (d.fromBody) {
+        const body = bodyRef.current
+        const scrollable = snap !== 'peek' && !!body && body.scrollHeight > body.clientHeight + 1
+        if (scrollable && !(dy > 0 && body.scrollTop <= 0)) {
+          drag.current = null
+          return
         }
       }
-      onSnapChange(best)
-    },
-    [drag, height, restingOffset, snap, onSnapChange, visibleFor],
-  )
+      d.from = restingOffset
+      d.y = e.clientY
+      node.style.transition = 'none'
+      try {
+        ;(e.currentTarget as HTMLElement).setPointerCapture(d.id)
+      } catch {
+        /* no capture available */
+      }
+      return
+    }
+
+    const at = Math.max(0, Math.min(height, d.from + (e.clientY - d.y)))
+    node.style.transform = `translate3d(0, ${at}px, 0)`
+  }
+
+  const onPointerUp = (e: React.PointerEvent) => {
+    const d = drag.current
+    const node = ref.current
+    if (!d || !node || e.pointerId !== d.id) return
+    drag.current = null
+    try {
+      ;(e.currentTarget as HTMLElement).releasePointerCapture(d.id)
+    } catch {
+      /* nothing captured */
+    }
+    if (d.from === null) return
+
+    node.style.transition = reduced ? 'none' : EASE
+    const moved = e.clientY - d.y
+    const landed = d.from + moved
+
+    // A flick beats position: a short fast drag should still change stop, and
+    // with three stops it moves one step rather than jumping to an end.
+    if (Math.abs(moved) > FLICK) {
+      const i = ORDER.indexOf(snap)
+      const next = moved > 0 ? Math.max(0, i - 1) : Math.min(ORDER.length - 1, i + 1)
+      const chosen = ORDER[next] as Snap
+      node.style.transform = `translate3d(0, ${Math.max(0, height - visibleFor(chosen))}px, 0)`
+      onSnapChange(chosen)
+      return
+    }
+
+    // otherwise settle on whichever stop the sheet was actually left nearest
+    let best: Snap = snap
+    let bestDist = Infinity
+    for (const s of ORDER) {
+      const dist = Math.abs(Math.max(0, height - visibleFor(s)) - landed)
+      if (dist < bestDist) {
+        bestDist = dist
+        best = s
+      }
+    }
+    node.style.transform = `translate3d(0, ${Math.max(0, height - visibleFor(best))}px, 0)`
+    onSnapChange(best)
+  }
 
   // Tapping the handle steps up through the stops and wraps back to peek, so
   // the middle position is reachable without knowing the sheet can be dragged.
@@ -146,18 +220,10 @@ export function BottomSheet({
   }
 
   return (
-    <aside
-      className={`sheet${drag ? ' is-dragging' : ''}`}
-      ref={ref}
-      aria-label={label}
-      style={{
-        transform: `translateY(${offset}px)`,
-        transition: drag || reduced ? 'none' : 'transform 240ms cubic-bezier(.22,.68,.24,1)',
-      }}
-    >
+    <aside className={`sheet sheet--${snap}`} ref={ref} aria-label={label}>
       <div
         className="sheet__grip"
-        onPointerDown={onPointerDown}
+        onPointerDown={(e) => begin(e, false)}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
         onPointerCancel={onPointerUp}
@@ -167,16 +233,32 @@ export function BottomSheet({
           className="sheet__handle"
           onClick={toggle}
           aria-expanded={snap !== 'peek'}
+          /**
+           * The visible word leads the accessible name. A control that reads
+           * "Tune" and announces "Show the controls" cannot be operated by
+           * anyone speaking what they can see, which is how voice control
+           * works and why the mismatch is a failure rather than a nicety.
+           */
           aria-label={
-            snap === 'peek' ? 'Show the controls'
-              : snap === 'half' ? 'Show all the controls'
-                : 'Hide the controls'
+            snap === 'peek' ? `${title}. Show the controls`
+              : snap === 'half' ? `${title}. Show all the controls`
+                : `${title}. Hide the controls`
           }
         >
-          <span />
+          <span className="sheet__pip" />
+          <span className="sheet__title">{title}</span>
         </button>
       </div>
-      <div className="sheet__body">{children}</div>
+      <div
+        className="sheet__body"
+        ref={bodyRef}
+        onPointerDown={(e) => begin(e, true)}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+        onPointerCancel={onPointerUp}
+      >
+        {children}
+      </div>
     </aside>
   )
 }
