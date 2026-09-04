@@ -4,7 +4,7 @@ A generative wallpaper studio that runs entirely in the browser. Pick a
 category, tune a few parameters, shuffle through styles, and export at your
 device's exact resolution. No backend, no auth, no database, no analytics.
 
-Twenty-eight styles across ten families. React 19 + Vite + TypeScript, with no
+Forty-three styles across fifteen families. React 19 + Vite + TypeScript, with no
 runtime dependencies beyond React.
 
 By **Rahul Mourya**.
@@ -38,12 +38,35 @@ src/
     compositor.ts   the pipeline every renderer runs through
     sampling.ts     shared packing, streamline and lighting helpers
     registry.ts     category -> family -> renderer
-    renderers/      ten family folders
+    renderers/      fifteen family folders
   export/           rasterizer and device presets
   ui/               two stages, rail, bottom sheet, export dialog
   state/            one store, synced to the URL hash
   dev/              contact sheet (dev only)
 ```
+
+### The families
+
+Ten families were built around what a composition is *made of* — cells, threads,
+shards, fluid. The five newer ones are built around a medium instead, which is
+why they do not collapse into the originals:
+
+- **Prismatic** draws light *after* it has been through something: a caustic net
+  measured from how much the surface squeezed each patch of floor, a beam fanned
+  by a prism, a wedge of debris mirrored round a circle.
+- **Nocturne** is a city made of light — neon as five stacked strokes rather than
+  a blur, traffic as a long exposure, a skyline whose depth is three tones of
+  aerial perspective and whose windows light in runs, not at random.
+- **Papercut** has no light model at all. Flat colour, hard edges, and depth made
+  only of a displaced dark copy: coiled quilling strips, scissor-cut collage, and
+  a shadow box of stacked sheets with a hole through each one.
+- **Ink** treats the bare ground as the subject. Strokes are shapes built from a
+  pressure curve rather than lines with a width, and the family's character turns
+  the shared lighting passes almost off so the paper can carry the picture.
+- **Mineral** is stone, cut and polished: agate bands that cannot cross because
+  they are one shape function scaled down, marble veins that propagate rather
+  than meander, and strata displaced by a fault so the same bed matches itself at
+  two heights across the break.
 
 ### Two stages, one set of candidates
 
@@ -92,7 +115,7 @@ behind it, the form itself with a misregistered outline, the field at full
 density clipped inside it, ghost geometry, elements crossing in front, the one
 accent, vignette, grain.
 
-That is what keeps ten families in one visual language, and why adding a style
+That is what keeps fifteen families in one visual language, and why adding a style
 is a file plus a registry line.
 
 ### Two things worth knowing before editing a renderer

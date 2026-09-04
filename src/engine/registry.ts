@@ -28,6 +28,21 @@ import { rippleRings } from './renderers/liquid/ripple-rings'
 import { circlePacking } from './renderers/cellular/circle-packing'
 import { voronoiCells } from './renderers/cellular/voronoi-cells'
 import { foam } from './renderers/cellular/foam'
+import { causticWeb } from './renderers/prismatic/caustic-web'
+import { prismFan } from './renderers/prismatic/prism-fan'
+import { kaleidoscope } from './renderers/prismatic/kaleidoscope'
+import { neonSigns } from './renderers/nocturne/neon-signs'
+import { lightTrails } from './renderers/nocturne/light-trails'
+import { skylineGlow } from './renderers/nocturne/skyline-glow'
+import { quilling } from './renderers/papercut/quilling'
+import { shadowBox } from './renderers/papercut/shadow-box'
+import { cutCollage } from './renderers/papercut/cut-collage'
+import { brushStrokes } from './renderers/ink/brush-strokes'
+import { inkBloom } from './renderers/ink/ink-bloom'
+import { washMountains } from './renderers/ink/wash-mountains'
+import { agateBands } from './renderers/mineral/agate-bands'
+import { marbleVein } from './renderers/mineral/marble-vein'
+import { strataFault } from './renderers/mineral/strata-fault'
 
 /**
  * A new family is a folder plus one entry here. Nothing else in the app knows
@@ -44,6 +59,11 @@ export const FAMILIES: readonly Family[] = [
   { id: 'architectural', name: 'Architectural', renderers: [colonnade, ribbedVault, isometricBlocks] },
   { id: 'liquid', name: 'Liquid', renderers: [mercury, oilSlick, rippleRings] },
   { id: 'cellular', name: 'Cellular', renderers: [circlePacking, voronoiCells, foam] },
+  { id: 'prismatic', name: 'Prismatic', renderers: [causticWeb, prismFan, kaleidoscope] },
+  { id: 'nocturne', name: 'Nocturne', renderers: [neonSigns, lightTrails, skylineGlow] },
+  { id: 'papercut', name: 'Papercut', renderers: [cutCollage, quilling, shadowBox] },
+  { id: 'ink', name: 'Ink', renderers: [brushStrokes, washMountains, inkBloom] },
+  { id: 'mineral', name: 'Mineral', renderers: [agateBands, marbleVein, strataFault] },
 ]
 
 const RENDERERS = new Map<string, Renderer>()

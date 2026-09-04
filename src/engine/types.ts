@@ -7,6 +7,7 @@ export type Dimensions = { width: number; height: number }
 export type FamilyId =
   | 'geometric' | 'organic' | 'retro-pop' | 'atmospheric' | 'technical'
   | 'cosmic' | 'textile' | 'architectural' | 'liquid' | 'cellular'
+  | 'prismatic' | 'nocturne' | 'papercut' | 'ink' | 'mineral'
 
 export type FocalKind = 'arch' | 'circle' | 'diamond' | 'ellipse' | 'disc' | 'lens' | 'portal'
 

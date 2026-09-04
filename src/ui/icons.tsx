@@ -16,6 +16,16 @@ const FAMILY_PATHS: Record<FamilyId, React.ReactNode> = {
   architectural: <><path d="M2 14V7h4v7" /><path d="M6 14V4h4v10" /><path d="M10 14V9h4v5" /></>,
   liquid: <><circle cx="8" cy="8" r="2" /><circle cx="8" cy="8" r="4.2" /><circle cx="8" cy="8" r="6.2" /></>,
   cellular: <><circle cx="5.5" cy="6" r="3" /><circle cx="10.5" cy="9.5" r="3.4" /><circle cx="11" cy="4" r="1.8" /></>,
+  // a prism with the fan leaving it
+  prismatic: <><path d="M6.5 2.5 2 13h9L6.5 2.5Z" /><path d="M11.5 6h3M11.5 8.5h3M11.5 11h3" /></>,
+  // a lit tube over its broken reflection
+  nocturne: <><path d="M3 9.5a5 5 0 0 1 10 0" /><path d="M3 13h2.5M7.5 13h1.5M11 13h2" /></>,
+  // three cut layers, each sitting on the one behind
+  papercut: <><path d="M1.5 6.5c3-2.5 5 2 6.5 0s3.5-2 6.5 0" /><path d="M1.5 9.5c3-2.5 5 2 6.5 0s3.5-2 6.5 0" /><path d="M1.5 12.5c3-2.5 5 2 6.5 0s3.5-2 6.5 0" /></>,
+  // a loaded stroke, and the seal under it
+  ink: <><path d="M2.5 3c2.5.5 5.5 3.5 5 8.5" /><rect x="10" y="10" width="4" height="4" rx="0.7" /></>,
+  // an agate: nested bands round a core
+  mineral: <><path d="M8 2c3.6 0 6 2.6 6 6s-2.4 6-6 6-6-2.6-6-6 2.4-6 6-6Z" /><path d="M8 5.2c1.9 0 3.2 1.2 3.2 2.8S9.9 10.8 8 10.8 4.8 9.6 4.8 8 6.1 5.2 8 5.2Z" /></>,
 }
 
 export function FamilyIcon({ family }: { family: FamilyId }): React.JSX.Element {

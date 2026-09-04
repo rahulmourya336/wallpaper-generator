@@ -140,6 +140,64 @@ export const CHARACTERS: Record<FamilyId, Character> = {
     bloom: 1.4,
     sheen: 1.05,
   },
+  // light after it has been through something. jewel grounds, hard bright
+  // edges, and the highest bloom in the studio — this family IS the highlight.
+  prismatic: {
+    palettes: ['abyss', 'teal', 'cobalt', 'indigo', 'plum', 'ocean', 'midnight'],
+    layouts: { centre: 3, macro: 3, diagonal: 3, thirds: 2, edge: 2, low: 2 },
+    vignette: 1.1,
+    grain: 0.55,
+    formFill: 0.34,
+    atmosphere: 1.25,
+    bloom: 1.7,
+    sheen: 1.25,
+  },
+  // a city at night. almost nothing is lit, and what is, is very lit.
+  nocturne: {
+    palettes: ['wine', 'plum', 'indigo', 'midnight', 'abyss', 'teal', 'cobalt'],
+    layouts: { low: 3, horizon: 3, thirds: 3, edge: 2, centre: 2, diagonal: 2 },
+    vignette: 1.25,
+    grain: 0.95,
+    formFill: 0.38,
+    atmosphere: 1.2,
+    bloom: 1.75,
+    sheen: 0.55,
+  },
+  // cut paper. flat colour, hard edges, and depth made only of shadow, so the
+  // shared light passes are turned nearly off and the paper tooth turned up.
+  papercut: {
+    palettes: ['paper', 'sand', 'sherbet', 'rose', 'citron', 'mist', 'clay', 'sage'],
+    layouts: { centre: 3, macro: 3, twin: 2, thirds: 3, low: 2, edge: 2 },
+    vignette: 0.3,
+    grain: 1.45,
+    formFill: 0.86,
+    atmosphere: 0.4,
+    bloom: 0.45,
+    sheen: 0.3,
+  },
+  // brush and paper. the emptiest family, and the only one that treats bare
+  // ground as the subject rather than as what is left over.
+  ink: {
+    palettes: ['paper', 'mist', 'sand', 'rose', 'obsidian', 'midnight'],
+    layouts: { thirds: 3, low: 3, horizon: 3, centre: 2, edge: 2 },
+    vignette: 0.25,
+    grain: 1.5,
+    formFill: 0.22,
+    atmosphere: 0.35,
+    bloom: 0.4,
+    sheen: 0.25,
+  },
+  // stone, cut and polished. banded, veined, and lit flat like a specimen.
+  mineral: {
+    palettes: ['wine', 'abyss', 'teal', 'plum', 'sand', 'rose', 'ocean', 'rust'],
+    layouts: { macro: 3, centre: 3, horizon: 2, twin: 2, thirds: 2, low: 2 },
+    vignette: 0.7,
+    grain: 1.2,
+    formFill: 0.7,
+    atmosphere: 0.75,
+    bloom: 0.9,
+    sheen: 1.15,
+  },
   // grown structures, packed. close, and often more than one colony.
   cellular: {
     palettes: ['verdigris','moss','wine','rust','sage','abyss','sand'],
