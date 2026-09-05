@@ -39,15 +39,29 @@ function render(ctx: RenderContext): Scene {
   const lx = light.dx
   const ly = -light.dy
 
+  /**
+   * The grid has to be generated wider than the frame, by exactly as much as
+   * the shear moves it.
+   *
+   * Each row is offset sideways by `row * pitch * skew`, which over a phone's
+   * worth of rows came to more than the width of the canvas — so the grid slid
+   * off one side and left a hard vertical edge down the picture with bare
+   * ground beyond it. Padding the column range by the accumulated shear is the
+   * fix; capping the shear first is what keeps that padding from tripling the
+   * dot count and eating the sample budget.
+   */
   const cols = Math.ceil(w / pitch) + 4
   const rows = Math.ceil(h / pitch) + 4
+  const shearPx = clamp(rows * pitch * skew, -w * 0.5, w * 0.5)
+  const perRow = shearPx / Math.max(1, rows)
+  const pad = Math.ceil(Math.abs(shearPx) / pitch) + 2
   let accent: string | undefined
 
   for (let row = -2; row < rows - 2; row++) {
     if ((row & 7) === 0 && ctx.expired()) break
-    for (let col = -2; col < cols - 2; col++) {
+    for (let col = -2 - pad; col < cols - 2 + pad; col++) {
       // offset rows, plus a slight shear, so the grid never reads as a table
-      const x = col * pitch + (row % 2 ? pitch * 0.5 : 0) + row * pitch * skew
+      const x = col * pitch + (row % 2 ? pitch * 0.5 : 0) + row * perRow
       const y = row * pitch * 0.87
       const dx = x - focal.cx
       const dy = y - focal.cy
