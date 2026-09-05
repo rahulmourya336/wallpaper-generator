@@ -1,7 +1,9 @@
 import { useSyncExternalStore } from 'react'
 import { allRenderers, rendererOr, familyOf, DEFAULT_STYLE_ID } from '../engine/registry'
 import { resolveParams } from '../engine/compositor'
-import { SEED_ALPHABET, SEED_LENGTH, isValidSeed } from '../engine/rng'
+import { SEED_ALPHABET, SEED_LENGTH, isValidSeed, makeRng } from '../engine/rng'
+import { randomizeParams } from '../engine/variant'
+import type { Variant } from '../engine/variant'
 import { DEFAULT_PRESET_ID, resolveSize } from '../export/presets'
 import type { ParamSchema } from '../engine/types'
 
@@ -40,19 +42,15 @@ function randomUnit(): number {
   return (b[0] as number) / 4294967296
 }
 
-/** Sample the middle of each range — the extremes are where compositions break. */
-function randomizeParams(schema: ParamSchema): Record<string, number | string> {
-  const out: Record<string, number | string> = {}
-  for (const spec of schema) {
-    if (spec.type === 'range') {
-      const span = spec.max - spec.min
-      const v = spec.min + span * 0.1 + randomUnit() * span * 0.8
-      out[spec.key] = Math.round(v / spec.step) * spec.step
-    } else {
-      out[spec.key] = spec.options[Math.floor(randomUnit() * spec.options.length)] as string
-    }
-  }
-  return out
+/**
+ * A fresh tuning for a style.
+ *
+ * The roll itself is deterministic — everything under engine/ has to be — so
+ * the non-determinism is pushed into the seed it is given, which is the one
+ * place in the app allowed to have any.
+ */
+function rollParams(schema: ParamSchema): Record<string, number | string> {
+  return randomizeParams(makeRng(newSeed(), 'shuffle/tune'), schema)
 }
 
 // --- hash serialisation ----------------------------------------------------
@@ -340,7 +338,7 @@ export const actions = {
   shuffle(): void {
     remember()
     if (state.seedLocked) {
-      set({ params: randomizeParams(rendererOr(state.styleId).schema) }, { push: true })
+      set({ params: rollParams(rendererOr(state.styleId).schema) }, { push: true })
       return
     }
     /**
@@ -355,8 +353,50 @@ export const actions = {
      */
     const styles = allRenderers()
     const next = styles[Math.floor(randomUnit() * styles.length)] ?? rendererOr(state.styleId)
+    /**
+     * The tuning is re-rolled with the style, and the colour goes back to the
+     * seed's choice.
+     *
+     * Landing on a new style at its factory defaults made every first look at a
+     * style identical to every other first look at it, and a palette pinned
+     * three shuffles ago followed the user around the catalogue tinting
+     * unrelated styles the same. Both were ways of arriving somewhere new and
+     * finding it looked like where you had been.
+     */
     set(
-      { seed: newSeed(), styleId: next.id, categoryId: familyOf(next.id), params: {} },
+      {
+        seed: newSeed(),
+        styleId: next.id,
+        categoryId: familyOf(next.id),
+        paletteId: AUTO_PALETTE,
+        params: rollParams(next.schema),
+      },
+      { push: true },
+    )
+  },
+
+  /**
+   * Adopt a candidate whole.
+   *
+   * A candidate is a category, a style, a colour and a tuning, so choosing one
+   * has to move all of them at once. Moving the seed alone — which is what this
+   * did while candidates were seeds — would land on the alternate's dice and the
+   * incumbent's design, which is neither of the two things on screen.
+   */
+  applyVariant(v: Variant): void {
+    if (!isValidSeed(v.seed)) return
+    if (v.seed === state.seed && v.styleId === state.styleId && v.paletteId === state.paletteId) {
+      return
+    }
+    remember()
+    set(
+      {
+        seed: v.seed,
+        styleId: v.styleId,
+        categoryId: v.categoryId,
+        paletteId: v.paletteId,
+        params: { ...v.params },
+      },
       { push: true },
     )
   },
@@ -372,13 +412,6 @@ export const actions = {
   setCategory(categoryId: string): void {
     if (categoryId === state.categoryId) return
     set({ categoryId })
-  },
-
-  /** Choosing one of the candidates on the stage. */
-  setSeed(seed: string): void {
-    if (!isValidSeed(seed) || seed === state.seed) return
-    remember()
-    set({ seed }, { push: true })
   },
 
   toggleLock(): void {

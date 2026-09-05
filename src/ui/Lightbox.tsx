@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { rendererOr } from '../engine/registry'
 import { resolveSize } from '../export/presets'
+import type { Variant } from '../engine/variant'
 import { actions, useCanGoBack, useStudio } from '../state/useStudio'
 import { CompositionView } from './CompositionView'
 import { PREVIEW_MAX_SHORT, fitAspect, useDebouncedComposition } from './useComposition'
+import { describeVariant } from './variantLabel'
 
 /**
  * The full-screen view.
@@ -61,22 +62,22 @@ function ExportIcon(): React.JSX.Element {
   )
 }
 
-function Frame({ seed, active }: { seed: string; active: boolean }): React.JSX.Element {
+function Frame({ variant, active }: { variant: Variant; active: boolean }): React.JSX.Element {
   const state = useStudio()
   const preset = resolveSize(state.exportPreset)
   const aspect = preset.width / preset.height
   const render = fitAspect({ width: preset.width, height: preset.height }, aspect, PREVIEW_MAX_SHORT)
-  const renderer = rendererOr(state.styleId)
+  const label = describeVariant(variant)
 
   // The one on screen leads. Its neighbours are composed too, so a swipe
   // arrives at a finished picture rather than a blank frame that fills in.
   const result = useDebouncedComposition(
     render.width > 1
       ? {
-          styleId: state.styleId,
-          seed,
-          paletteId: state.paletteId,
-          params: state.params,
+          styleId: variant.styleId,
+          seed: variant.seed,
+          paletteId: variant.paletteId,
+          params: variant.params,
           width: render.width,
           height: render.height,
         }
@@ -90,7 +91,7 @@ function Frame({ seed, active }: { seed: string; active: boolean }): React.JSX.E
         <CompositionView
           result={result}
           fit="meet"
-          {...(active ? { label: `${renderer.name}, seed ${seed}` } : {})}
+          {...(active ? { label: `${label.text}, seed ${variant.seed}` } : {})}
         />
       ) : null}
     </div>
@@ -98,14 +99,14 @@ function Frame({ seed, active }: { seed: string; active: boolean }): React.JSX.E
 }
 
 export function Lightbox({
-  seeds,
+  variants,
   index,
   onIndex,
   onClose,
   onExport,
 }: {
-  seeds: readonly string[]
-  /** -1 when closed; otherwise the position of the selected seed */
+  variants: readonly Variant[]
+  /** -1 when closed; otherwise the position of the selected candidate */
   index: number
   onIndex: (i: number) => void
   onClose: () => void
@@ -126,7 +127,7 @@ export function Lightbox({
 
   const go = useCallback(
     (delta: number) => {
-      const next = Math.max(0, Math.min(seeds.length - 1, index + delta))
+      const next = Math.max(0, Math.min(variants.length - 1, index + delta))
       if (next === index) return
       // Moving here selects, so what you looked at last is what the rest of
       // the app is on when you close. The index is derived from the selection
@@ -134,7 +135,7 @@ export function Lightbox({
       // when a shuffle replaces the whole set from underneath.
       onIndex(next)
     },
-    [index, seeds.length, onIndex],
+    [index, variants.length, onIndex],
   )
 
   useEffect(() => {
@@ -183,6 +184,8 @@ export function Lightbox({
 
   // Follows the finger while dragging, then springs to the next frame.
   const shift = drag ? drag.dx : 0
+  const here = variants[index]
+  const shown = here ? describeVariant(here) : null
 
   return (
     <dialog
@@ -205,8 +208,8 @@ export function Lightbox({
               transition: drag ? 'none' : 'transform 260ms cubic-bezier(.22,.68,.24,1)',
             }}
           >
-            {seeds.map((seed, i) => (
-              <Frame key={seed} seed={seed} active={i === index} />
+            {variants.map((variant, i) => (
+              <Frame key={variant.seed} variant={variant} active={i === index} />
             ))}
           </div>
 
@@ -219,12 +222,32 @@ export function Lightbox({
             &times;
           </button>
 
-          {seeds.length > 1 ? (
+          {variants.length > 1 ? (
             <div className="lb__dots" aria-hidden="true">
-              {seeds.map((seed, i) => (
-                <span key={seed} className={i === index ? 'is-on' : ''} />
+              {variants.map((variant, i) => (
+                <span key={variant.seed} className={i === index ? 'is-on' : ''} />
               ))}
             </div>
+          ) : null}
+
+          {/**
+           * What you are looking at, named.
+           *
+           * This is where a candidate stops being a thumbnail and becomes the
+           * thing you might keep, so it is where the category and style are
+           * worth the space — and where a swipe between three unlike designs
+           * needs them, because nothing else on this screen says the picture
+           * changed kind rather than merely changed.
+           */}
+          {shown ? (
+            <p className="lb__name" aria-live="polite">
+              <span className="lb__name-style">{shown.style}</span>
+              <span className="lb__name-meta">
+                {shown.category}
+                {shown.palette ? <span className="lb__name-dot" aria-hidden="true" /> : null}
+                {shown.palette}
+              </span>
+            </p>
           ) : null}
 
           <div className="pill pill--actions lb__bar">

@@ -1,6 +1,7 @@
 import { makeRng } from './rng'
 import { makeNoise } from './noise'
-import { getPalette, mixHex, PALETTES, rampAt, suitsMode, withAlpha } from './palette'
+import { getPalette, mixHex, rampAt, withAlpha } from './palette'
+import { palettePool, pickPaletteId } from './palette-pick'
 import type { Palette } from './palette'
 import { characterOf } from './character'
 import { fieldTransform, pickLayout, planLayout } from './layout'
@@ -108,25 +109,14 @@ export function compose(input: ComposeInput): ComposeResult {
   // draws, or the filmstrip thumbnail would show a different composition from
   // the canvas it is meant to restyle.
   const root = makeRng(seed, renderer.id)
-  const paletteRng = root.fork('palette')
   const layoutRng = root.fork('layout')
   const focalRng = root.fork('focal')
   const lightRng = root.fork('light')
   const noiseRng = root.fork('noise')
 
   // --- palette: the family's pool, biased to the style's declared mode -----
-  const pool = character.palettes.length ? character.palettes : PALETTES.map((p) => p.id)
-  const requested = input.paletteId
-  const fromParams = typeof params['palette'] === 'string' ? (params['palette'] as string) : undefined
-  const preferred = pool.filter((id) => {
-    const p = getPalette(id)
-    return p ? suitsMode(p, renderer.dark) : false
-  })
-  const chosenId =
-    requested && pool.includes(requested) ? requested
-    : fromParams && pool.includes(fromParams) ? fromParams
-    : preferred.length && paletteRng.bool(0.78) ? paletteRng.pick(preferred)
-    : paletteRng.pick(pool)
+  const pool = palettePool(renderer)
+  const chosenId = pickPaletteId(renderer, seed, input.paletteId, params)
   const palette = getPalette(chosenId) ?? (getPalette(pool[0] as string) as Palette)
 
   // --- layout: where the subject sits, and how the field is turned ---------

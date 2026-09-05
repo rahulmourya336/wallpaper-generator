@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { rendererOr } from '../engine/registry'
 import { resolveSize } from '../export/presets'
+import type { Variant } from '../engine/variant'
 import { actions, useStudio } from '../state/useStudio'
 import { CompositionView } from './CompositionView'
-import { fitAspect, paramsKey, useDebouncedComposition, useRasterShortEdge } from './useComposition'
+import { fitAspect, useDebouncedComposition, useRasterShortEdge } from './useComposition'
 import { useCandidates } from './useCandidates'
 import { useElementSize } from './useElementSize'
+import { describeVariant } from './variantLabel'
 
 /**
  * The phone stage.
@@ -51,24 +53,35 @@ function useIdle(key: string): boolean {
 }
 
 function Frame({
-  seed,
+  variant,
   active,
   index,
-  label,
+  armed,
 }: {
-  seed: string
+  variant: Variant
   active: boolean
   index: number
-  label: string
+  /** identity of the round of work on screen; re-arms the idle gate */
+  armed: string
 }): React.JSX.Element {
   const state = useStudio()
   const preset = resolveSize(state.exportPreset)
   const aspect = preset.width / preset.height
-  const short = useRasterShortEdge(aspect, !!rendererOr(state.styleId).build)
+  /**
+   * Asked of this candidate's own renderer, not the selection's.
+   *
+   * The two are no longer the same style, and the per-pixel families want a far
+   * smaller raster than the vector ones do — reading the flag off the selection
+   * would size a swipe-away frame against whatever the selected style happened
+   * to be, which is either a needlessly soft picture or a needlessly expensive
+   * one depending on which way round they fell.
+   */
+  const short = useRasterShortEdge(aspect, !!rendererOr(variant.styleId).build)
   const render = useMemo(
     () => fitAspect({ width: preset.width, height: preset.height }, aspect, short),
     [preset.width, preset.height, aspect, short],
   )
+  const label = describeVariant(variant)
 
   /**
    * The one on screen leads, and the alternates wait for a gap.
@@ -81,15 +94,15 @@ function Frame({
    * back to back on load is the difference between an app that opens and an app
    * that hangs.
    */
-  const idle = useIdle(`${state.styleId}|${state.paletteId}|${paramsKey(state.params)}`)
+  const idle = useIdle(armed)
 
   const result = useDebouncedComposition(
     render.width > 1 && (active || idle)
       ? {
-          styleId: state.styleId,
-          seed,
-          paletteId: state.paletteId,
-          params: state.params,
+          styleId: variant.styleId,
+          seed: variant.seed,
+          paletteId: variant.paletteId,
+          params: variant.params,
           width: render.width,
           height: render.height,
         }
@@ -123,7 +136,11 @@ function Frame({
       aria-hidden={active ? undefined : true}
     >
       {result ? (
-        <CompositionView result={result} raster {...(active ? { label } : {})} />
+        <CompositionView
+          result={result}
+          raster
+          {...(active ? { label: `${label.text}, seed ${variant.seed}` } : {})}
+        />
       ) : null}
     </div>
   )
@@ -142,7 +159,6 @@ export function MobileStage({
 }): React.JSX.Element {
   const state = useStudio()
   const candidates = useCandidates()
-  const renderer = rendererOr(state.styleId)
   const deckRef = useRef<HTMLDivElement | null>(null)
 
   /**
@@ -175,8 +191,20 @@ export function MobileStage({
    * pictures per settled slider tick to show one. That is the cost that makes a
    * phone slider feel like it is dragging something heavy.
    */
-  const shown = tuning ? [state.seed] : candidates
-  const index = Math.max(0, shown.indexOf(state.seed))
+  const selected = candidates.find((v) => v.seed === state.seed) ?? (candidates[0] as Variant)
+  const shown = tuning ? [selected] : candidates
+  const index = Math.max(0, shown.findIndex((v) => v.seed === state.seed))
+  const here = describeVariant(shown[index] ?? selected)
+  /**
+   * One identity for the round of work on screen.
+   *
+   * The idle gate used to key off the selected style and its parameters, which
+   * was the same thing for all three frames back when they only differed by
+   * seed. Now each frame is its own design, so what has to re-arm the gate is
+   * the set — otherwise a shuffle that lands on the same style leaves the two
+   * alternates gated on a key that never changed.
+   */
+  const armed = shown.map((v) => `${v.styleId}:${v.seed}:${v.paletteId}`).join('|')
 
   const rest = useCallback(
     (i: number) => `translate3d(${-i * 100}%, 0, 0)`,
@@ -277,11 +305,11 @@ export function MobileStage({
       ? Math.max(0, Math.min(shown.length - 1, index + (dx < 0 ? 1 : -1)))
       : index
 
-    const seed = shown[next]
-    if (seed && seed !== state.seed) {
+    const variant = shown[next]
+    if (variant && variant.seed !== state.seed) {
       // Selecting here selects everywhere; the deck settles from the effect
       // that follows the selection, so there is no second copy of the position.
-      actions.setSeed(seed)
+      actions.applyVariant(variant)
     } else {
       node.style.transform = rest(index)
     }
@@ -298,34 +326,53 @@ export function MobileStage({
         onPointerCancel={onPointerUp}
       >
         <div className="mstage__deck" ref={deckRef}>
-          {shown.map((seed, i) => (
+          {shown.map((variant, i) => (
             <Frame
-              key={seed}
-              seed={seed}
+              key={variant.seed}
+              variant={variant}
               index={i}
               active={i === index}
-              label={`${renderer.name}, seed ${seed}`}
+              armed={armed}
             />
           ))}
         </div>
       </div>
 
+      {/**
+       * What the frame on screen is, named over the artwork.
+       *
+       * The title bar's crumb is the first thing dropped at phone widths, so on
+       * the one device that shows the alternates one at a time — and now shows
+       * three unlike designs rather than three rolls of one — nothing said which
+       * of them you had arrived at. It sits on a chip for the same reason the
+       * dots do: half the palettes are light, and text at a low opacity vanishes
+       * into a pale sky.
+       */}
+      <p className="mstage__name" aria-live="polite">
+        <span className="mstage__name-style">{here.style}</span>
+        <span className="mstage__name-meta">
+          {here.category}
+          {here.palette ? <span className="mstage__name-dot" aria-hidden="true" /> : null}
+          {here.palette}
+        </span>
+      </p>
+
       {shown.length > 1 ? (
         /**
          * Buttons in a group, not a tablist. A tab is a promise that it
          * controls a panel, and there are no panels here — the deck is one
-         * view showing one of three seeds. Plain buttons describe what these
+         * view showing one of three designs. Plain buttons describe what these
          * actually do, which is select.
          */
         <div className="mstage__dots" role="group" aria-label="Alternates">
-          {shown.map((seed, i) => (
+          {shown.map((variant, i) => (
             <button
-              key={seed}
+              key={variant.seed}
               type="button"
               className={`mstage__dot${i === index ? ' is-on' : ''}`}
               aria-pressed={i === index}
-              aria-label={`Alternate ${i + 1} of ${shown.length}`}
-              onClick={() => actions.setSeed(seed)}
+              aria-label={`${describeVariant(variant).text}, alternate ${i + 1} of ${shown.length}`}
+              onClick={() => actions.applyVariant(variant)}
             />
           ))}
         </div>

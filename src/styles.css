@@ -121,7 +121,9 @@ body { margin: 0; background: var(--bg); color: var(--text); }
   flex-direction: column;
   gap: 0.75rem;
   padding: var(--gutter);
-  padding-bottom: 4.5rem;
+  /* the action bar floats at the bottom, and each cell now carries a caption
+     below it that has to clear the bar rather than sit behind it */
+  padding-bottom: 6.6rem;
   background: radial-gradient(115% 70% at 50% -8%, #16161f 0%, var(--bg) 62%);
   background:
     radial-gradient(115% 70% at 50% -8%,
@@ -188,21 +190,53 @@ body { margin: 0; background: var(--bg); color: var(--text); }
     0 0 4rem -1rem color-mix(in srgb, var(--art-accent) 35%, transparent);
 }
 
-.cand__seed {
+/**
+ * The candidate's name, under its picture.
+ *
+ * Outside the button's box rather than over the artwork: a caption laid on top
+ * has to survive fifteen families of composition behind it, and the one place
+ * on a stage that is reliably empty is the gap between the cells and the action
+ * bar. The row gives up the height for it, so nothing overlaps at any size.
+ */
+.cand__cap {
   position: absolute;
-  left: 50%; bottom: -1.45rem;
-  translate: -50% 0;
-  font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
-  font-size: 0.62rem;
-  letter-spacing: 0.08em;
-  color: var(--text-faint);
-  opacity: 0;
-  transition: opacity 160ms ease;
+  left: 0; right: 0; top: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.1rem;
+  padding-top: 0.5rem;
+  line-height: 1.25;
 }
 
-.cand__btn:hover .cand__seed,
-.cand__btn.is-selected .cand__seed { opacity: 1; }
-.cand__btn.is-selected .cand__seed { color: var(--art-accent); }
+.cand__cap-style {
+  max-width: 100%;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--text-dim);
+  transition: color 200ms ease;
+}
+
+.cand__cap-meta {
+  display: flex; align-items: center; gap: 0.4rem;
+  max-width: 100%;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-size: 0.62rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+.cand__cap-dot {
+  width: 0.2rem; height: 0.2rem;
+  border-radius: 999px;
+  background: currentColor;
+  opacity: 0.7;
+}
+
+.cand__btn:hover .cand__cap-style { color: var(--text); }
+.cand__btn.is-selected .cand__cap-style { color: var(--art-accent); }
 
 .composition__svg,
 .composition__raster {
@@ -615,6 +649,49 @@ input[type='number'] {
 .mstage__dot.is-on::before { width: 1.15rem; background: var(--art-accent, #fff); }
 
 /**
+ * The name of the design on screen, above the dots.
+ *
+ * Rides with them as the sheet moves, so the two read as one caption for the
+ * frame rather than a label that the controls slide underneath.
+ */
+.mstage__name {
+  position: absolute;
+  left: 50%; translate: -50% 0;
+  bottom: calc(var(--sheet-h, 4rem) + var(--bar-h, 60px) + 2.9rem);
+  z-index: 4;
+  margin: 0;
+  max-width: min(88vw, 22rem);
+  display: flex; flex-direction: column; align-items: center; gap: 0.1rem;
+  padding: 0.4rem 0.85rem;
+  border-radius: 0.75rem;
+  background: #0b0b10a8;
+  backdrop-filter: blur(10px);
+  text-align: center;
+  transition: bottom 260ms cubic-bezier(.22,.68,.24,1);
+}
+
+.mstage__name-style {
+  max-width: 100%;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-size: 0.8rem; font-weight: 620;
+  color: var(--text);
+}
+
+.mstage__name-meta {
+  display: flex; align-items: center; gap: 0.4rem;
+  font-size: 0.58rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #ffffffa8;
+}
+
+.mstage__name-dot {
+  width: 0.18rem; height: 0.18rem;
+  border-radius: 999px;
+  background: currentColor;
+}
+
+/**
  * Lift the action bar clear of the sheet.
  *
  * The bar is absolutely positioned against the bottom of the studio, so without
@@ -1010,4 +1087,46 @@ input[type='number'] {
 .lb__bar {
   bottom: max(1.1rem, env(safe-area-inset-bottom));
   z-index: 4;
+}
+
+/**
+ * The name of the design filling the screen, sat just above the action bar.
+ *
+ * On a chip, because unlike the stage there is nowhere here that is not
+ * artwork, and half the palettes are light enough to swallow pale text.
+ */
+.lb__name {
+  position: absolute;
+  left: 50%; translate: -50% 0;
+  bottom: calc(max(1.1rem, env(safe-area-inset-bottom)) + 3.5rem);
+  z-index: 4;
+  margin: 0;
+  max-width: min(90vw, 26rem);
+  display: flex; flex-direction: column; align-items: center; gap: 0.15rem;
+  padding: 0.45rem 0.9rem;
+  border-radius: 0.8rem;
+  background: #0b0b10a8;
+  backdrop-filter: blur(10px);
+  text-align: center;
+}
+
+.lb__name-style {
+  max-width: 100%;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-size: 0.85rem; font-weight: 620;
+  color: var(--text);
+}
+
+.lb__name-meta {
+  display: flex; align-items: center; gap: 0.45rem;
+  font-size: 0.62rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #ffffffa8;
+}
+
+.lb__name-dot {
+  width: 0.2rem; height: 0.2rem;
+  border-radius: 999px;
+  background: currentColor;
 }

@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useState } from 'react'
-import { rendererOr } from '../engine/registry'
 import { resolveSize } from '../export/presets'
+import type { Variant } from '../engine/variant'
 import { actions, useStudio } from '../state/useStudio'
 import { CompositionView } from './CompositionView'
 import { Lightbox } from './Lightbox'
 import { PREVIEW_MAX_SHORT, fitAspect, useDebouncedComposition } from './useComposition'
 import { useCandidates } from './useCandidates'
 import { useElementSize } from './useElementSize'
+import { describeVariant } from './variantLabel'
 
 /**
  * The stage shows candidates, not one answer.
@@ -16,6 +17,10 @@ import { useElementSize } from './useElementSize'
  * answers that at a glance, and replaces the browse tray that used to sit
  * under the canvas doing the same job less directly.
  *
+ * The three are three different ideas — a different category, style, colour and
+ * tuning each — because three rolls of one idea only ever answered "which of
+ * these near-identical pictures", which is not a question anybody has.
+ *
  * This is the desktop arrangement. A phone has neither the width to put three
  * compositions side by side nor the headroom to keep three vector previews
  * live, so it gets its own stage — see MobileStage.
@@ -24,13 +29,13 @@ import { useElementSize } from './useElementSize'
 type Size = { width: number; height: number }
 
 function Candidate({
-  seed,
+  variant,
   selected,
   onPick,
   index,
   size,
 }: {
-  seed: string
+  variant: Variant
   selected: boolean
   onPick: () => void
   index: number
@@ -38,8 +43,8 @@ function Candidate({
 }): React.JSX.Element {
   const state = useStudio()
   const preset = resolveSize(state.exportPreset)
-  const renderer = rendererOr(state.styleId)
   const aspect = preset.width / preset.height
+  const label = describeVariant(variant)
 
   const render = useMemo(
     () => fitAspect({ width: preset.width, height: preset.height }, aspect, PREVIEW_MAX_SHORT),
@@ -49,10 +54,10 @@ function Candidate({
   const result = useDebouncedComposition(
     render.width > 1
       ? {
-          styleId: state.styleId,
-          seed,
-          paletteId: state.paletteId,
-          params: state.params,
+          styleId: variant.styleId,
+          seed: variant.seed,
+          paletteId: variant.paletteId,
+          params: variant.params,
           width: render.width,
           height: render.height,
         }
@@ -70,7 +75,7 @@ function Candidate({
     root.style.setProperty('--art-ramp', result.palette.ramp[3] as string)
   }, [selected, result])
 
-  const label = `${renderer.name}, seed ${seed}`
+  const spoken = `${label.text}, ${label.palette}, seed ${variant.seed}`
 
   return (
     <button
@@ -78,16 +83,31 @@ function Candidate({
       className={`cand__btn${selected ? ' is-selected' : ''}`}
       onClick={onPick}
       aria-pressed={selected}
-      aria-label={selected ? `${label}. Selected.` : `Choose ${label}`}
+      aria-label={selected ? `${spoken}. Selected.` : `Choose ${spoken}`}
+      title={spoken}
       style={{ width: size.width, height: size.height }}
     >
       <span
         className={`cand__frame${result ? '' : ' cand__frame--empty'}`}
         style={result ? { background: result.palette.ground } : undefined}
       >
-        {result ? <CompositionView result={result} label={label} /> : null}
+        {result ? <CompositionView result={result} label={spoken} /> : null}
       </span>
-      <span className="cand__seed">{seed}</span>
+      {/**
+       * Named under the picture, always, not on hover.
+       *
+       * The whole point of three unlike candidates is that the choice is between
+       * kinds of thing; a name that only appears once you are already pointing
+       * at one arrives after the decision it was meant to inform.
+       */}
+      <span className="cand__cap">
+        <span className="cand__cap-style">{label.style}</span>
+        <span className="cand__cap-meta">
+          {label.category}
+          {label.palette ? <span className="cand__cap-dot" aria-hidden="true" /> : null}
+          {label.palette}
+        </span>
+      </span>
     </button>
   )
 }
@@ -112,38 +132,39 @@ export function Stage({ onExport }: { onExport?: () => void } = {}): React.JSX.E
     if (row.width < 2 || row.height < 2) return { width: 0, height: 0 }
     const n = Math.max(1, candidates.length)
     const each = (row.width - gap * (n - 1)) / n
-    return fitAspect({ width: each, height: row.height }, aspect)
+    // room under each cell for the name, which is outside the button's box
+    return fitAspect({ width: each, height: row.height - 34 }, aspect)
   }, [row, aspect, candidates.length])
 
   return (
     <div className="stage__row" ref={rowRef} style={{ gap }}>
       {cell.width > 1
-        ? candidates.map((seed, i) => (
+        ? candidates.map((variant, i) => (
             <Candidate
-              key={seed}
-              seed={seed}
+              key={variant.seed}
+              variant={variant}
               index={i}
               size={cell}
-              selected={seed === state.seed}
+              selected={variant.seed === state.seed}
               onPick={() => {
-                actions.setSeed(seed)
+                actions.applyVariant(variant)
                 setZoomed(true)
               }}
             />
           ))
         : null}
       <Lightbox
-        seeds={candidates}
+        variants={candidates}
         /**
          * Derived, not stored. A shuffle from inside the full screen view
          * replaces the whole candidate set, and an index held here would be
          * pointing into the old one; reading it back off the selection means
          * there is no second copy of the truth to keep in step.
          */
-        index={zoomed ? Math.max(0, candidates.indexOf(state.seed)) : -1}
+        index={zoomed ? Math.max(0, candidates.findIndex((v) => v.seed === state.seed)) : -1}
         onIndex={(i) => {
-          const seed = candidates[i]
-          if (seed) actions.setSeed(seed)
+          const variant = candidates[i]
+          if (variant) actions.applyVariant(variant)
         }}
         onClose={() => setZoomed(false)}
         onExport={() => onExport?.()}
