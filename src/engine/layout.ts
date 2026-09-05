@@ -167,17 +167,29 @@ export function pickLayout(rng: Rng, weights: Partial<Record<LayoutId, number>>)
   return pool[pool.length - 1]?.[0] ?? 'centre'
 }
 
+/**
+ * `subjectScale` is the direction's say in how big the subject is.
+ *
+ * The layouts describe an arrangement — where the subject sits and how the
+ * field is turned — and every one of them asked for a radius between a quarter
+ * and four fifths of the short edge. That band is why the catalogue read as one
+ * idea: whatever the style, the subject came out the same size. Scaling here
+ * rather than inside each layout keeps the arrangement intact and lets a
+ * category be composed close or far without a second set of layouts.
+ */
 export function planLayout(
   id: LayoutId,
   rng: Rng,
   box: Box,
   kind: FocalKind,
   secondKind: FocalKind,
+  subjectScale: readonly [number, number] = [1, 1],
 ): LayoutPlan {
   const spec = SPECS[id](box)
   const screenCx = box.w * rng.range(spec.cx[0], spec.cx[1])
   const screenCy = box.h * rng.range(spec.cy[0], spec.cy[1])
-  const screenR = box.short * rng.range(spec.r[0], spec.r[1])
+  const screenR =
+    box.short * rng.range(spec.r[0], spec.r[1]) * rng.range(subjectScale[0], subjectScale[1])
   const rotate = rng.range(spec.rotate[0], spec.rotate[1]) * (rng.bool() ? 1 : -1)
   const zoom = Math.max(coverZoom(rotate, box.w, box.h), rng.range(spec.zoom[0], spec.zoom[1]))
   const flip = rng.bool(0.5)

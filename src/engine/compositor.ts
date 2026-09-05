@@ -132,6 +132,7 @@ export function compose(input: ComposeInput): ComposeResult {
     { w, h, short, aspect },
     kind,
     focalRng.pick(renderer.focals),
+    character.subjectScale,
   )
   const focal = plan.focals[0] as Focal
   const focals = plan.focals
@@ -201,11 +202,22 @@ export function compose(input: ComposeInput): ComposeResult {
      * readable; it just no longer bottoms out.
      */
     density: (x, y) => {
-      // A floor here meant every renderer kept sprinkling at 22% out to the
-      // corners, forever. A wallpaper needs real empty space; the answer to a
-      // frame that looks bare is a bigger subject, not background confetti.
+      /**
+       * How fast the field empties, decided by the category's direction.
+       *
+       * A floor here meant every renderer kept sprinkling out to the corners
+       * forever, and one fixed curve meant a woven cloth thinned toward its
+       * edges exactly like a night sky. At 0 the field is even to the frame
+       * edge, which is the only honest answer for a macro texture; above 1 the
+       * ground goes genuinely bare and the marks gather, which is what the
+       * quiet direction is for.
+       */
+      if (inside(x, y)) return 1
+      const k = character.falloff
       const d = decay(x, y)
-      return inside(x, y) ? 1 : 0.9 * d * d * (3 - 2 * d)
+      const s = d * d * (3 - 2 * d)
+      const shaped = k <= 1 ? 1 - k * (1 - s) : Math.pow(s, k)
+      return (1 - 0.1 * Math.min(k, 1)) * shaped
     },
     noise2: noise.noise2,
     fbm: noise.fbm,
@@ -395,10 +407,15 @@ function assemble(
   if (renderer.mode !== 'canvas') {
     const off = ctx.u(2.6)
     for (const foc of focals) {
+      const fill = el('path', {
+        d: foc.path,
+        fill: mixHex(p.ground, p.ramp[0], character.formFill),
+      })
       field.push(
-        // the subject sits above the field, so it casts onto it
-        el('g', { filter: `url(#${uid}-cast)` },
-          el('path', { d: foc.path, fill: mixHex(p.ground, p.ramp[0], character.formFill) })) +
+        // The subject sits above the field, so it casts onto it — except where
+        // the direction is printed rather than photographed, and a soft shadow
+        // under a flat shape is the single clearest way to break that.
+        (character.cast ? el('g', { filter: `url(#${uid}-cast)` }, fill) : fill) +
           el('path', {
             d: foc.path,
             fill: 'none',
@@ -413,8 +430,11 @@ function assemble(
   // stage 5: the field at full density, clipped to the form
   field.push(group({ 'clip-path': `url(#${uid}-in)` }, scene.subject))
 
-  // stage 6: ghost geometry
-  field.push(group({ fill: 'none' }, ghostGeometry(ctx)))
+  // stage 6: ghost geometry, where the direction admits construction lines at
+  // all. On a flat print or a macro texture they read as leftovers.
+  if (character.ghosts > 0 && ctx.fork('ghost-gate').bool(character.ghosts)) {
+    field.push(group({ fill: 'none' }, ghostGeometry(ctx)))
+  }
 
   // stage 7: elements crossing over the form edge
   field.push(group({ filter: `url(#${uid}-lift)` }, scene.front))
@@ -427,7 +447,7 @@ function assemble(
 
   // stage 1: ground, in screen space so the transform cannot expose bare edges
   if (renderer.mode !== 'canvas') {
-    layers.push(groundFill(ctx, uid))
+    layers.push(groundFill(ctx, uid, character.ground === 'flat'))
     layers.push(shade(ctx, uid, character))
     layers.push(atmosphere(ctx, uid, plan, character))
   }

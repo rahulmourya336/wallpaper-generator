@@ -184,9 +184,19 @@ export function sheen(ctx: RenderContext, uid: string, character: Character): st
   )
 }
 
-/** A ground that is lit rather than filled: the palette's own colours, softened. */
-export function groundFill(ctx: RenderContext, uid: string): string {
+/**
+ * A ground that is lit rather than filled: the palette's own colours, softened.
+ *
+ * Unless the direction is printed, in which case it is exactly filled. A
+ * gradient is a claim that light is falling across the surface, and under flat
+ * shapes with hard edges that claim is the thing that makes the picture look
+ * like a render of a poster instead of a poster.
+ */
+export function groundFill(ctx: RenderContext, uid: string, flat = false): string {
   const { w, h, short, palette: p, light } = ctx
+  if (flat) {
+    return el('rect', { x: 0, y: 0, width: w, height: h, fill: p.ground })
+  }
 
   // A vertical ramp on every style is why forty-three of them read as
   // siblings. Running the axis along the light means the ground says where the

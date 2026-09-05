@@ -211,6 +211,209 @@ export const CHARACTERS: Record<FamilyId, Character> = {
   },
 }
 
-export function characterOf(family: FamilyId): Character {
-  return CHARACTERS[family] ?? DEFAULT
+/**
+ * How a category is composed, as distinct from what it draws.
+ *
+ * Character gave every family its own colours and its own taste in layouts, and
+ * it was not enough: forty-three styles still arrived as one roundish mass,
+ * centred, on a soft vertical gradient, because every one of them was handed a
+ * focal form to aim at and the same finishing passes on the way out. The
+ * differences between families were real and all of them were small.
+ *
+ * A direction is the larger decision underneath that — what a composition in
+ * this category IS. There are four, and they disagree about the fundamentals:
+ * how much of the frame the subject takes, whether there is a subject at all,
+ * whether the ground carries light or is flat colour, and whether the picture
+ * is graded like a photograph or printed like a poster. Assigning them by
+ * medium is what stops the catalogue reading as one idea with variations.
+ */
+export type DirectionId = 'quiet' | 'graphic' | 'macro' | 'atmospheric'
+
+export type Direction = {
+  /** multiplier band on whatever radius the layout asked for */
+  subjectScale: [number, number]
+  /** multiplies the family's own layout weights; 0 rules a layout out */
+  layoutBias: Partial<Record<LayoutId, number>>
+  /** a lit ground, or flat colour with no gradient in it at all */
+  ground: 'gradient' | 'flat'
+  /**
+   * How hard the field empties away from the subject.
+   *
+   * 0 fills edge to edge, which is what a macro texture wants and what a
+   * composed frame must never do; above 1 the ground is mostly bare and the
+   * marks cluster, which is the whole point of the quiet direction.
+   */
+  falloff: number
+  /** does the subject drop a shadow onto the field */
+  cast: boolean
+  /** how often the ghost geometry pass runs at all, 0..1 */
+  ghosts: number
+  /** scales the shared finishing passes */
+  mul: {
+    vignette: number
+    grain: number
+    atmosphere: number
+    bloom: number
+    sheen: number
+    formFill: number
+  }
+}
+
+export const DIRECTIONS: Record<DirectionId, Direction> = {
+  /**
+   * Mostly nothing, and one thing worth finding.
+   *
+   * The subject is small and pushed off-centre or through an edge, and the
+   * field thins fast away from it. This is the only direction that treats bare
+   * ground as the subject rather than as what is left over, so the finishing
+   * passes are nearly all off: a vignette would put a frame around emptiness
+   * and make it read as a vignette rather than as space.
+   */
+  quiet: {
+    subjectScale: [0.38, 0.62],
+    layoutBias: { thirds: 3, edge: 3, low: 2, horizon: 2, centre: 0.2, macro: 0, twin: 0.5, diagonal: 0.6 },
+    ground: 'gradient',
+    falloff: 1.7,
+    cast: true,
+    ghosts: 0,
+    mul: { vignette: 0, grain: 0.6, atmosphere: 0.45, bloom: 0.6, sheen: 0.35, formFill: 0.3 },
+  },
+  /**
+   * Printed, not rendered.
+   *
+   * Flat colour, hard edges, and scale doing the work that light does
+   * elsewhere. Every photographic pass is off — no haze, no sheen, no
+   * vignette, almost no grain — because each of them is a way of saying "this
+   * is a photograph of something", and this direction is saying the opposite.
+   */
+  graphic: {
+    subjectScale: [0.85, 1.3],
+    layoutBias: { centre: 2, macro: 2, twin: 2.5, diagonal: 2, edge: 1.5, horizon: 0.4, thirds: 1.2, low: 0.8 },
+    ground: 'flat',
+    falloff: 0.3,
+    cast: false,
+    ghosts: 0,
+    mul: { vignette: 0, grain: 0.25, atmosphere: 0, bloom: 0.35, sheen: 0, formFill: 1.15 },
+  },
+  /**
+   * Too close to see the whole of anything.
+   *
+   * The focal form is pushed out to about the size of the frame, so there is no
+   * subject to
+   * find and no composition in the arranging sense — the texture is the
+   * composition. The falloff goes to zero because a macro that thins toward
+   * the corners has quietly become a subject again.
+   */
+  macro: {
+    subjectScale: [0.9, 1.15],
+    layoutBias: { macro: 4, diagonal: 2, centre: 0.3, twin: 0.3, thirds: 0.2, low: 0.2, horizon: 0.4, edge: 0.3 },
+    ground: 'gradient',
+    falloff: 0,
+    cast: false,
+    ghosts: 0,
+    mul: { vignette: 0.4, grain: 1.25, atmosphere: 0.4, bloom: 0.6, sheen: 0.7, formFill: 0 },
+  },
+  /**
+   * Depth, and a subject too large to be contained.
+   *
+   * The one direction that keeps the full light model, pushed further: the
+   * subject is big enough that the frame cuts it, which is what stops it
+   * reading as an object floating in the middle of a picture.
+   */
+  atmospheric: {
+    subjectScale: [0.95, 1.45],
+    layoutBias: { edge: 3, macro: 2.5, low: 2, diagonal: 2, horizon: 1.5, centre: 0.4, thirds: 1, twin: 0.6 },
+    ground: 'gradient',
+    falloff: 0.95,
+    cast: true,
+    ghosts: 0.45,
+    mul: { vignette: 1.15, grain: 0.9, atmosphere: 1.45, bloom: 1.2, sheen: 1.3, formFill: 0.8 },
+  },
+}
+
+/**
+ * Which direction each category is composed in, chosen by what the medium
+ * actually is rather than to spread the four evenly. Stone, silk and liquid are
+ * things you get close to; cut paper and printed geometry are things that lie
+ * flat; ink and a night sky are mostly empty on purpose.
+ */
+export const FAMILY_DIRECTION: Record<FamilyId, DirectionId> = {
+  geometric: 'graphic',
+  'retro-pop': 'graphic',
+  papercut: 'graphic',
+  technical: 'graphic',
+
+  organic: 'quiet',
+  cosmic: 'quiet',
+  ink: 'quiet',
+
+  textile: 'macro',
+  liquid: 'macro',
+  cellular: 'macro',
+  mineral: 'macro',
+
+  atmospheric: 'atmospheric',
+  architectural: 'atmospheric',
+  prismatic: 'atmospheric',
+  nocturne: 'atmospheric',
+}
+
+export function directionOf(family: FamilyId): Direction {
+  return DIRECTIONS[FAMILY_DIRECTION[family] ?? 'atmospheric']
+}
+
+/**
+ * The character a composition is actually built with: the family's own taste,
+ * scaled by its direction.
+ *
+ * Folding the multipliers in here rather than at each call site is what let the
+ * whole catalogue move without touching a single renderer — everything
+ * downstream already reads these numbers off the character it is given.
+ */
+export type TunedCharacter = Character & {
+  direction: DirectionId
+  subjectScale: [number, number]
+  ground: Direction['ground']
+  falloff: number
+  cast: boolean
+  ghosts: number
+}
+
+const tuned = new Map<FamilyId, TunedCharacter>()
+
+export function characterOf(family: FamilyId): TunedCharacter {
+  const hit = tuned.get(family)
+  if (hit) return hit
+
+  const base = CHARACTERS[family] ?? DEFAULT
+  const id = FAMILY_DIRECTION[family] ?? 'atmospheric'
+  const d = DIRECTIONS[id]
+
+  const layouts: Partial<Record<LayoutId, number>> = {}
+  for (const [k, weight] of Object.entries(base.layouts) as [LayoutId, number][]) {
+    const w = weight * (d.layoutBias[k] ?? 1)
+    if (w > 0.01) layouts[k] = w
+  }
+  // a bias that rules out everything the family liked would leave nothing to
+  // pick from, so fall back to the family's own weights rather than to none
+  const safeLayouts = Object.keys(layouts).length ? layouts : base.layouts
+
+  const out: TunedCharacter = {
+    palettes: base.palettes,
+    layouts: safeLayouts,
+    vignette: base.vignette * d.mul.vignette,
+    grain: base.grain * d.mul.grain,
+    formFill: base.formFill * d.mul.formFill,
+    atmosphere: base.atmosphere * d.mul.atmosphere,
+    bloom: base.bloom * d.mul.bloom,
+    sheen: base.sheen * d.mul.sheen,
+    direction: id,
+    subjectScale: d.subjectScale,
+    ground: d.ground,
+    falloff: d.falloff,
+    cast: d.cast,
+    ghosts: d.ghosts,
+  }
+  tuned.set(family, out)
+  return out
 }
