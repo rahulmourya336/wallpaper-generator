@@ -3,3 +3,7 @@ dist
 .DS_Store
 *.local
 .vite
+
+# headless contact sheet
+shots*
+.sheet.cjs
