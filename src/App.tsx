@@ -94,7 +94,7 @@ export function App(): React.JSX.Element {
             <section className="stage" aria-label="Choose a wallpaper">
               <p className="stage__prompt">
                 Pick the one you like
-                <span>three different styles, colours and settings — shuffle for three more</span>
+                <span>three different styles and colours, shuffle for three more</span>
               </p>
               <Stage onExport={() => setExporting(true)} />
               <StagePills onExport={() => setExporting(true)} />
