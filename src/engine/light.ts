@@ -1,4 +1,4 @@
-import { hexToRgb, withAlpha } from './palette'
+import { hexToRgb, mixHex, withAlpha } from './palette'
 import type { Palette } from './palette'
 import { el, ellipsePath, f } from './svg'
 import type { RenderContext } from './types'
@@ -32,9 +32,15 @@ export function lightDefs(ctx: RenderContext, uid: string, character: Character)
   const { u } = ctx
   return [
     // wide soft blur for the colour wash behind everything
+    // The region has to be given in user space over the whole canvas. On the
+    // bounding box it was -35%..135%, and with a 30px blur the tail ran past
+    // the region and got hard-clipped, which is where the vertical seam down
+    // the side of the atmosphere layer came from.
     el('filter',
       {
-        id: `${uid}-soft`, x: '-35%', y: '-35%', width: '170%', height: '170%',
+        id: `${uid}-soft`,
+        filterUnits: 'userSpaceOnUse',
+        x: -ctx.w, y: -ctx.h, width: ctx.w * 3, height: ctx.h * 3,
         'color-interpolation-filters': 'sRGB',
       },
       el('feGaussianBlur', { stdDeviation: u(70) })),
@@ -94,26 +100,63 @@ export function atmosphere(
   character: Character,
 ): string {
   if (character.atmosphere <= 0) return ''
-  const rng = ctx.fork('atmosphere')
-  const { w, h, short, palette: p } = ctx
-  const blobs: string[] = []
-  const count = 5
+  const { w, h, short, palette: p, light } = ctx
 
-  for (let i = 0; i < count; i++) {
-    // one blob always sits under the subject so the focal area glows
-    const onSubject = i === 0
-    const cx = onSubject ? plan.screen.cx : rng.range(-0.1, 1.1) * w
-    const cy = onSubject ? plan.screen.cy : rng.range(-0.05, 1.05) * h
-    const rx = short * rng.range(0.35, 0.8)
-    const ry = rx * rng.range(0.6, 1.35)
-    const tone = i % 3 === 0 ? p.accent : ctx.ramp(rng.range(0.55, 1))
-    const alpha = (onSubject ? 0.3 : rng.range(0.12, 0.26)) * character.atmosphere
-    blobs.push(el('path', { d: ellipsePath(cx, cy, rx, ry), fill: withAlpha(tone, alpha) }))
-  }
+  // Light comes from somewhere. Three masses, each with a reason to exist: the
+  // source, the subject it falls on, and the air between. Five blobs at random
+  // positions average out to fog, and fog is the one thing that guarantees a
+  // flat picture.
+  //
+  // Dark palettes take less. They begin near the bottom of the value range,
+  // which is their whole appeal, and a lift sized for a light ground spends it.
+  const gain = (p.mode === 'dark' ? 0.55 : 1) * character.atmosphere
+  const srcX = w * 0.5 + light.dx * short * 0.85
+  const srcY = h * 0.5 + light.dy * short * 0.85
+
+  const blobs = [
+    { cx: srcX, cy: srcY, rx: short * 0.95, ry: short * 0.8, tone: ctx.ramp(0.92), a: 0.26 },
+    { cx: plan.screen.cx, cy: plan.screen.cy, rx: short * 0.6, ry: short * 0.66, tone: p.accent, a: 0.16 },
+    {
+      cx: (srcX + plan.screen.cx) * 0.5,
+      cy: (srcY + plan.screen.cy) * 0.5,
+      rx: short * 0.7, ry: short * 0.55, tone: ctx.ramp(0.6), a: 0.13,
+    },
+  ]
 
   return el('g',
     { filter: `url(#${uid}-soft)`, style: `mix-blend-mode:${lightenBlend(p)}` },
-    blobs.join(''))
+    blobs
+      .map((b) => el('path', {
+        d: ellipsePath(b.cx, b.cy, b.rx, b.ry),
+        fill: withAlpha(b.tone, b.a * gain),
+      }))
+      .join(''))
+}
+
+/**
+ * The other half of the light model, and the half that was missing.
+ *
+ * Everything else here blends `screen`. With no counterpart the deep grounds
+ * get lifted by every pass that touches them and the frame settles into the
+ * middle of its own value range, which is what "bland" is. This is one soft
+ * mass in the quadrant the light does not reach, multiplied, so a composition
+ * has somewhere genuinely dark to sit against.
+ */
+export function shade(ctx: RenderContext, uid: string, character: Character): string {
+  if (character.atmosphere <= 0) return ''
+  const { w, h, short, palette: p, light } = ctx
+  const depth = (p.mode === 'light' ? 0.2 : 0.45) * character.atmosphere
+
+  return el('g',
+    { filter: `url(#${uid}-soft)`, style: 'mix-blend-mode:multiply' },
+    el('path', {
+      d: ellipsePath(
+        w * 0.5 - light.dx * short * 0.9,
+        h * 0.5 - light.dy * short * 0.9,
+        short * 1.15, short * 1.0,
+      ),
+      fill: withAlpha(p.ink, depth),
+    }))
 }
 
 /**
@@ -126,11 +169,11 @@ export function sheen(ctx: RenderContext, uid: string, character: Character): st
   const cx = w * 0.5 + light.dx * short * 0.55
   const cy = h * 0.5 + light.dy * short * 0.55
   const rgb = hexToRgb(p.mode === 'light' ? p.ink : ctx.ramp(1))
-  const peak = (p.mode === 'light' ? 0.1 : 0.22) * character.sheen
+  const peak = (p.mode === 'light' ? 0.12 : 0.3) * character.sheen
 
   return (
     el('radialGradient',
-      { id: `${uid}-sheen`, gradientUnits: 'userSpaceOnUse', cx, cy, r: short * 1.15 },
+      { id: `${uid}-sheen`, gradientUnits: 'userSpaceOnUse', cx, cy, r: short * 0.72 },
       el('stop', { offset: '0', 'stop-color': `rgb(${rgb.r},${rgb.g},${rgb.b})`, 'stop-opacity': peak.toFixed(3) }) +
       el('stop', { offset: '1', 'stop-color': `rgb(${rgb.r},${rgb.g},${rgb.b})`, 'stop-opacity': 0 })) +
     el('rect', {
@@ -143,14 +186,24 @@ export function sheen(ctx: RenderContext, uid: string, character: Character): st
 
 /** A ground that is lit rather than filled: the palette's own colours, softened. */
 export function groundFill(ctx: RenderContext, uid: string): string {
-  const { w, h, palette: p } = ctx
-  const warm = ctx.ramp(0.34)
+  const { w, h, short, palette: p, light } = ctx
+
+  // A vertical ramp on every style is why forty-three of them read as
+  // siblings. Running the axis along the light means the ground says where the
+  // light is before anything is drawn on it, and no two angles ground alike.
+  const lit = p.mode === 'light' ? mixHex(p.ground, '#FFFFFF', 0.3) : ctx.ramp(0.26)
+  const dark = p.mode === 'light' ? ctx.ramp(0.22) : mixHex(p.ink, '#000000', 0.3)
+
   return (
     el('linearGradient',
-      { id: `${uid}-ground`, gradientUnits: 'userSpaceOnUse', x1: 0, y1: 0, x2: 0, y2: h },
-      el('stop', { offset: '0', 'stop-color': p.mode === 'light' ? warm : p.ink }) +
-      el('stop', { offset: '0.45', 'stop-color': p.ground }) +
-      el('stop', { offset: '1', 'stop-color': p.mode === 'light' ? p.ground : warm })) +
+      {
+        id: `${uid}-ground`, gradientUnits: 'userSpaceOnUse',
+        x1: w * 0.5 + light.dx * short * 1.1, y1: h * 0.5 + light.dy * short * 1.1,
+        x2: w * 0.5 - light.dx * short * 1.1, y2: h * 0.5 - light.dy * short * 1.1,
+      },
+      el('stop', { offset: '0', 'stop-color': lit }) +
+      el('stop', { offset: '0.42', 'stop-color': p.ground }) +
+      el('stop', { offset: '1', 'stop-color': dark })) +
     el('rect', { x: 0, y: 0, width: w, height: h, fill: `url(#${uid}-ground)` })
   )
 }

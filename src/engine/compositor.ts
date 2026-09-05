@@ -6,8 +6,8 @@ import type { Palette } from './palette'
 import { characterOf } from './character'
 import { fieldTransform, pickLayout, planLayout } from './layout'
 import type { LayoutId, LayoutPlan } from './layout'
-import { atmosphere, bloomed, groundFill, lightDefs, sheen } from './light'
-import { attrs, circlePath, clamp, el, f, group, lerp } from './svg'
+import { atmosphere, bloomed, groundFill, lightDefs, shade, sheen } from './light'
+import { attrs, clamp, el, f, group, lerp } from './svg'
 import { resolveToScene } from './scene/svg-backend'
 import { canRaster, countPrimitives, renderGraph } from './pipeline/render'
 import { graphIsGpuReady, renderGpu } from './gpu/render'
@@ -200,7 +200,13 @@ export function compose(input: ComposeInput): ComposeResult {
      * as bare ground with a detail in one corner. The step is still clearly
      * readable; it just no longer bottoms out.
      */
-    density: (x, y) => (inside(x, y) ? 1 : 0.42) * (0.52 + 0.48 * decay(x, y)),
+    density: (x, y) => {
+      // A floor here meant every renderer kept sprinkling at 22% out to the
+      // corners, forever. A wallpaper needs real empty space; the answer to a
+      // frame that looks bare is a bigger subject, not background confetti.
+      const d = decay(x, y)
+      return inside(x, y) ? 1 : 0.9 * d * d * (3 - 2 * d)
+    },
     noise2: noise.noise2,
     fbm: noise.fbm,
     num: (key) => {
@@ -222,7 +228,7 @@ export function compose(input: ComposeInput): ComposeResult {
      * every ambient mark on the right side of visible without touching the
      * strong values, where the ramp still ends exactly where it did.
      */
-    ramp: (t) => rampAt(palette, 0.12 + 0.88 * clamp(t, 0, 1)),
+    ramp: (t) => rampAt(palette, 0.04 + 0.96 * clamp(t, 0, 1)),
   }
 
   /**
@@ -422,6 +428,7 @@ function assemble(
   // stage 1: ground, in screen space so the transform cannot expose bare edges
   if (renderer.mode !== 'canvas') {
     layers.push(groundFill(ctx, uid))
+    layers.push(shade(ctx, uid, character))
     layers.push(atmosphere(ctx, uid, plan, character))
   }
   layers.push(transform ? el('g', { transform }, field.join('')) : field.join(''))
@@ -449,16 +456,19 @@ function ghostGeometry(ctx: RenderContext): string[] {
   const { focal } = ctx
   const base = Math.max(focal.rx, focal.ry)
   const out: string[] = []
-  const count = rng.int(3, 6)
+  const count = rng.int(0, 2)
   for (let i = 0; i < count; i++) {
     const r = base * lerp(1.06, 2.35, i / Math.max(1, count - 1)) * rng.range(0.94, 1.08)
-    const opacity = rng.range(0.4, 0.6) * (1 - 0.35 * (i / count))
+    const opacity = rng.range(0.14, 0.24) * (1 - 0.35 * (i / count))
     const stroke = withAlpha(ctx.ramp(rng.range(0.45, 0.75)), opacity)
     const width = ctx.u(rng.range(0.7, 1.3))
-    if (rng.bool(0.45)) {
-      out.push(el('path', { d: circlePath(focal.cx, focal.cy, r), stroke, 'stroke-width': width }))
-      continue
-    }
+    /**
+     * Arcs only. A closed ring reads as a drawn object — a second subject
+     * competing with the focal form it is supposed to be sitting behind —
+     * where an arc reads as something passing through the frame. The full
+     * circle used to come up on a coin flip and was the louder half of a pass
+     * whose whole job is to be barely noticed.
+     */
     const a0 = rng.range(0, Math.PI * 2)
     const a1 = a0 + rng.range(Math.PI * 0.45, Math.PI * 1.5)
     out.push(el('path', {
