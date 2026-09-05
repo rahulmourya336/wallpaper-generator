@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo } from 'react'
 import { variantFrom, variantsAround } from '../engine/variant'
 import type { Variant } from '../engine/variant'
-import { getState, useStudio } from '../state/useStudio'
+import { useStudio } from '../state/useStudio'
+import type { StudioState } from '../state/useStudio'
 
 /**
  * The candidate set behind both stages.
@@ -16,26 +17,44 @@ import { getState, useStudio } from '../state/useStudio'
 
 export const COUNT = 3
 
-/** Alternates derived from the selected design, so a shared link reproduces the set. */
-export function setAround(anchor: Variant): Variant[] {
-  return variantsAround(anchor, COUNT)
-}
+/**
+ * The set lives at module scope, not in a component.
+ *
+ * It used to be `useState` inside this hook, which made it per-component, and
+ * the two stages are different components: crossing the mobile breakpoint
+ * unmounts one and mounts the other, so a window resize or a phone rotation
+ * built a brand new set. Worse, it built it around whichever candidate was
+ * *selected* rather than the one the set was originally derived from, so the
+ * other two alternates were replaced by an unrelated pair — exactly the thing
+ * the note above says must not happen.
+ *
+ * Deriving it during render rather than from an effect matters for the same
+ * reason. An effect runs after the paint, so every seed change — a shuffle, the
+ * back button, a pasted link — committed one frame in which the selected design
+ * was in no candidate at all: the desktop stage showed nothing selected, and the
+ * phone deck fell back to the first slot and animated to it before the real set
+ * arrived and moved it again.
+ *
+ * Rebuilding here is safe because it is idempotent. Once the set contains the
+ * selected seed, further calls in the same pass — a second component, or a
+ * StrictMode double-invoke — find it and return the same array.
+ */
+let live: Variant[] = []
 
-export function useCandidates(): Variant[] {
-  const state = useStudio()
-  const [candidates, setCandidates] = useState(() => setAround(variantFrom(state)))
-
+function ensure(state: StudioState): Variant[] {
   /**
    * Picking a candidate must not reshuffle the others: the one you were
    * comparing against would vanish the moment you chose. So the set is rebuilt
    * only when the selected seed arrives from outside it, which is a shuffle, a
    * restyle, or landing on a link.
    */
-  useEffect(() => {
-    setCandidates((prev) =>
-      prev.some((v) => v.seed === state.seed) ? prev : setAround(variantFrom(getState())),
-    )
-  }, [state.seed])
+  if (!live.some((v) => v.seed === state.seed)) live = variantsAround(variantFrom(state), COUNT)
+  return live
+}
+
+export function useCandidates(): Variant[] {
+  const state = useStudio()
+  const set = ensure(state)
 
   /**
    * The selected slot mirrors the live state rather than the stored copy.
@@ -46,7 +65,7 @@ export function useCandidates(): Variant[] {
    * would be the only one on screen that never changed.
    */
   return useMemo(
-    () => candidates.map((v) => (v.seed === state.seed ? variantFrom(state) : v)),
-    [candidates, state],
+    () => set.map((v) => (v.seed === state.seed ? variantFrom(state) : v)),
+    [set, state],
   )
 }

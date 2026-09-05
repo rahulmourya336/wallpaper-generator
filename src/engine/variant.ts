@@ -40,7 +40,18 @@ export function randomizeParams(rng: Rng, schema: ParamSchema): Record<string, n
     if (spec.type === 'range') {
       const span = spec.max - spec.min
       const v = spec.min + span * 0.1 + rng.next() * span * 0.8
-      out[spec.key] = Math.round(v / spec.step) * spec.step
+      /**
+       * Snapped to the step, then to the precision the URL keeps.
+       *
+       * Stepping alone leaves float noise — a tenth of these land on values
+       * like 0.7000000000000001 — and the hash writes three decimals, so the
+       * value in memory and the value a reloaded link produces were not the
+       * same number. The picture is identical either way (the renderers round
+       * long before it could matter) but the two disagree as cache keys, so a
+       * shared link recomposed everything it could have reused. The finest
+       * step in the catalogue is 0.005, so three decimals is still on-step.
+       */
+      out[spec.key] = Math.round((Math.round(v / spec.step) * spec.step) * 1000) / 1000
     } else {
       out[spec.key] = rng.pick(spec.options)
     }
@@ -92,6 +103,21 @@ function choosePalette(
 }
 
 /**
+ * A seed no other candidate in the set is using.
+ *
+ * A collision is vanishingly unlikely — six base-36 characters is two billion —
+ * but the seed is the identity the stages key their lists on and match the
+ * selection against, so a repeat would not be a near-duplicate picture, it
+ * would be two React children sharing a key and one selection lighting up two
+ * cells. Cheap to make impossible rather than merely improbable.
+ */
+function freshSeed(rng: Rng, used: ReadonlySet<string>): string {
+  let seed = seedFrom(rng)
+  for (let guard = 0; used.has(seed) && guard < 8; guard++) seed = seedFrom(rng)
+  return seed
+}
+
+/**
  * Resolve a partial description — typically the live studio state, whose
  * palette may still be `auto` — into a candidate with every field settled.
  */
@@ -128,15 +154,18 @@ export function variantsAround(anchor: Variant, count: number): Variant[] {
   const palettes = new Set<string>([anchor.paletteId])
   const modes = new Set<string>([modeOf(anchor.paletteId)])
 
+  const seeds = new Set<string>([anchor.seed])
+
   for (let i = 1; i < count; i++) {
     const family = chooseFamily(rng, families)
     const renderer = chooseStyle(rng, family, styles)
-    const seed = seedFrom(rng)
+    const seed = freshSeed(rng, seeds)
     const paletteId = choosePalette(rng, renderer, seed, palettes, modes)
     // forked by name, so the tuning does not shift with how many draws the
     // choices above happened to take
     const params = randomizeParams(rng.fork(`tune/${i}`), renderer.schema)
 
+    seeds.add(seed)
     families.add(family.id)
     styles.add(renderer.id)
     palettes.add(paletteId)
