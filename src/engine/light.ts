@@ -140,7 +140,7 @@ export function lightDefs(ctx: RenderContext, uid: string, character: Character)
             el('feFuncA', { type: 'linear', slope: 3 })) +
           el('feGaussianBlur', { in: 'a', stdDeviation: u(9 * character.bloom), result: 'b' }) +
           el('feComposite', { in: 'b', in2: 'a', operator: 'out', result: 'ring' }) +
-          el('feFlood', { 'flood-color': mixHex(p.ink, p.ground, 0.25), result: 'f' }) +
+          el('feFlood', { 'flood-color': mixHex(p.ink, p.ground, 0.45), result: 'f' }) +
           el('feComposite', { in: 'f', in2: 'ring', operator: 'in' })
         : el('feGaussianBlur', { stdDeviation: u(9 * character.bloom), result: 'b' }) +
           el('feComponentTransfer', { in: 'b' },
@@ -447,7 +447,7 @@ export function bloomed(
     el('g',
       {
         filter: `url(#${uid}-bloom)`,
-        opacity: pale ? 0.36 : undefined,
+        opacity: pale ? 0.26 : undefined,
         style: `mix-blend-mode:${lightenBlend(p)}`,
       },
       accent) +
