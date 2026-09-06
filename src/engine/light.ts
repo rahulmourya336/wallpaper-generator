@@ -109,12 +109,15 @@ export function atmosphere(
   //
   // Dark palettes take less. They begin near the bottom of the value range,
   // which is their whole appeal, and a lift sized for a light ground spends it.
-  const gain = (p.mode === 'dark' ? 0.55 : 1) * character.atmosphere
+  // Dark grounds took a much smaller lift when the ramps were monochrome and a
+  // glow was just a paler patch of the same hue. Now the top of the ramp is a
+  // different colour from the ground, the glow is the point, and it can carry.
+  const gain = (p.mode === 'dark' ? 0.8 : 1) * character.atmosphere
   const srcX = w * 0.5 + light.dx * short * 0.85
   const srcY = h * 0.5 + light.dy * short * 0.85
 
   const blobs = [
-    { cx: srcX, cy: srcY, rx: short * 0.95, ry: short * 0.8, tone: ctx.ramp(0.92), a: 0.26 },
+    { cx: srcX, cy: srcY, rx: short * 1.05, ry: short * 0.9, tone: ctx.ramp(0.96), a: 0.34 },
     { cx: plan.screen.cx, cy: plan.screen.cy, rx: short * 0.6, ry: short * 0.66, tone: p.accent, a: 0.16 },
     {
       cx: (srcX + plan.screen.cx) * 0.5,
@@ -201,7 +204,9 @@ export function groundFill(ctx: RenderContext, uid: string, flat = false): strin
   // A vertical ramp on every style is why forty-three of them read as
   // siblings. Running the axis along the light means the ground says where the
   // light is before anything is drawn on it, and no two angles ground alike.
-  const lit = p.mode === 'light' ? mixHex(p.ground, '#FFFFFF', 0.3) : ctx.ramp(0.26)
+  // Further up the ramp than before: with hue in the ramp this is the second
+  // colour of the ground's own gradient, not a paler version of the first.
+  const lit = p.mode === 'light' ? mixHex(p.ground, '#FFFFFF', 0.3) : ctx.ramp(0.38)
   const dark = p.mode === 'light' ? ctx.ramp(0.22) : mixHex(p.ink, '#000000', 0.3)
 
   return (

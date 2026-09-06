@@ -333,9 +333,15 @@ export const DIRECTIONS: Record<DirectionId, Direction> = {
 
 /**
  * Which direction each category is composed in, chosen by what the medium
- * actually is rather than to spread the four evenly. Stone, silk and liquid are
- * things you get close to; cut paper and printed geometry are things that lie
- * flat; ink and a night sky are mostly empty on purpose.
+ * actually is rather than to spread the four evenly. Stone, cells and liquid
+ * are things you get close to; cut paper and printed geometry lie flat; ink and
+ * a night sky are mostly empty on purpose.
+ *
+ * Textile is not macro, though the medium suggests it. Its three styles draw
+ * objects — a drape, a bloom, a knot — not a weave, and under macro the gather
+ * point a drape hangs from was pushed off the frame and the cloth arrived as
+ * one line. A subject that overruns the frame and takes the full light model is
+ * what a fold of silk actually wants.
  */
 export const FAMILY_DIRECTION: Record<FamilyId, DirectionId> = {
   geometric: 'graphic',
@@ -347,13 +353,13 @@ export const FAMILY_DIRECTION: Record<FamilyId, DirectionId> = {
   cosmic: 'quiet',
   ink: 'quiet',
 
-  textile: 'macro',
   liquid: 'macro',
   cellular: 'macro',
   mineral: 'macro',
 
   atmospheric: 'atmospheric',
   architectural: 'atmospheric',
+  textile: 'atmospheric',
   prismatic: 'atmospheric',
   nocturne: 'atmospheric',
 }

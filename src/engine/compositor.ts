@@ -403,27 +403,25 @@ function assemble(
   // stage 3: elements passing behind the focal form
   field.push(group({}, scene.behind))
 
-  // stage 4: the focal form, with a misregistered outline
+  /**
+   * stage 4: the focal form.
+   *
+   * It used to carry a misregistered outline, a hairline stroke offset toward
+   * the light. That was the single clearest tell that these were diagrams: a
+   * shape with a line around it is a symbol of a thing, where a shape with a
+   * shadow under it is a thing. The form is now fill and shadow only, and its
+   * edge is whatever the field draws across it.
+   */
   if (renderer.mode !== 'canvas') {
-    const off = ctx.u(2.6)
     for (const foc of focals) {
       const fill = el('path', {
         d: foc.path,
         fill: mixHex(p.ground, p.ramp[0], character.formFill),
       })
-      field.push(
-        // The subject sits above the field, so it casts onto it — except where
-        // the direction is printed rather than photographed, and a soft shadow
-        // under a flat shape is the single clearest way to break that.
-        (character.cast ? el('g', { filter: `url(#${uid}-cast)` }, fill) : fill) +
-          el('path', {
-            d: foc.path,
-            fill: 'none',
-            stroke: withAlpha(ctx.ramp(0.7), 0.55),
-            'stroke-width': ctx.u(1.6),
-            transform: `translate(${f(off * ctx.light.dx)} ${f(-off * ctx.light.dy)})`,
-          }),
-      )
+      // The subject sits above the field, so it casts onto it — except where
+      // the direction is printed rather than photographed, and a soft shadow
+      // under a flat shape is the single clearest way to break that.
+      field.push(character.cast ? el('g', { filter: `url(#${uid}-cast)` }, fill) : fill)
     }
   }
 
@@ -460,7 +458,9 @@ function assemble(
   layers.push(el('rect', {
     x: 0, y: 0, width: w, height: h,
     fill: `url(#${uid}-grain)`,
-    opacity: ((p.mode === 'light' ? 0.075 : 0.1) * character.grain).toFixed(3),
+    // Halved. At a tenth the grain read as a filter laid over the picture, and
+    // on a phone at three device pixels per point it read as noise.
+    opacity: ((p.mode === 'light' ? 0.04 : 0.05) * character.grain).toFixed(3),
     style: 'mix-blend-mode:overlay',
   }))
 
