@@ -30,6 +30,23 @@ function lightenBlend(p: Palette): string {
 
 export function lightDefs(ctx: RenderContext, uid: string, character: Character): string[] {
   const { u } = ctx
+  /**
+   * Every filter region is given in user space over the canvas, never on the
+   * bounding box of what it is applied to.
+   *
+   * A bounding-box region is a percentage of the content's own extent, and the
+   * content is sometimes a single vertical hairline crossing the frame, or a
+   * pass with nothing in it. That is a region with no width, which one
+   * rasteriser we rely on treats as a fatal error rather than as nothing to
+   * draw: it was the cause of nearly half the catalogue failing to rasterise in
+   * the headless sheet. A fixed region costs nothing measurable in a browser,
+   * which clips it to the drawn area regardless.
+   */
+  const m = u(120)
+  const region = {
+    filterUnits: 'userSpaceOnUse',
+    x: -m, y: -m, width: ctx.w + 2 * m, height: ctx.h + 2 * m,
+  }
   return [
     // wide soft blur for the colour wash behind everything
     // The region has to be given in user space over the whole canvas. On the
@@ -48,7 +65,7 @@ export function lightDefs(ctx: RenderContext, uid: string, character: Character)
     // bloom: blur the source and push its alpha up so the halo actually reads
     el('filter',
       {
-        id: `${uid}-bloom`, x: '-60%', y: '-60%', width: '220%', height: '220%',
+        id: `${uid}-bloom`, ...region,
         'color-interpolation-filters': 'sRGB',
       },
       el('feGaussianBlur', { stdDeviation: u(9 * character.bloom), result: 'b' }) +
@@ -58,7 +75,7 @@ export function lightDefs(ctx: RenderContext, uid: string, character: Character)
     // the subject sits above the field, so it casts
     el('filter',
       {
-        id: `${uid}-cast`, x: '-25%', y: '-25%', width: '150%', height: '150%',
+        id: `${uid}-cast`, ...region,
         'color-interpolation-filters': 'sRGB',
       },
       el('feDropShadow', {
@@ -72,7 +89,7 @@ export function lightDefs(ctx: RenderContext, uid: string, character: Character)
     // a lighter touch for elements that cross in front
     el('filter',
       {
-        id: `${uid}-lift`, x: '-25%', y: '-25%', width: '150%', height: '150%',
+        id: `${uid}-lift`, ...region,
         'color-interpolation-filters': 'sRGB',
       },
       el('feDropShadow', {
