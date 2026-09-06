@@ -56,9 +56,12 @@ function render(ctx: RenderContext): Scene {
   const span = Math.hypot(w, h) * 1.25
   const steps = Math.max(16, Math.round(30 * Math.max(0.5, ctx.quality ** 0.5)))
 
-  // where the cloth is gathered: a point the folds converge on
+  // Where the cloth is gathered: a point the folds converge on. Kept within a
+  // frame's reach of the subject — a tall focal put it several screens above
+  // the canvas, and folds converging on a point that far away are parallel
+  // lines by the time they arrive, most of them off the frame entirely.
   const gx = focal.cx + skel.gauss() * focal.rx * 0.5
-  const gy = focal.cy - focal.ry * lerp(0.4, 1.5, gatherK)
+  const gy = focal.cy - Math.min(focal.ry * lerp(0.4, 1.5, gatherK), ctx.short * 0.9)
 
   const count = Math.round(lerp(9, 34, foldK))
   const amp = ctx.short * lerp(0.02, 0.085, drapeK)
