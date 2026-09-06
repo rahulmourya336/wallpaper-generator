@@ -1,12 +1,12 @@
 import { makeRng } from './rng'
 import { makeNoise } from './noise'
-import { getPalette, mixHex, rampAt, withAlpha } from './palette'
+import { getPalette, mixHex, rampAt } from './palette'
 import { palettePool, pickPaletteId } from './palette-pick'
 import type { Palette } from './palette'
 import { characterOf } from './character'
 import { fieldTransform, pickLayout, planLayout } from './layout'
 import type { LayoutId, LayoutPlan } from './layout'
-import { atmosphere, bloomed, groundFill, lightDefs, shade, sheen } from './light'
+import { atmosphere, bloomed, formGradients, groundFill, lightDefs, shade, sheen } from './light'
 import { attrs, clamp, el, f, group, lerp } from './svg'
 import { resolveToScene } from './scene/svg-backend'
 import { canRaster, countPrimitives, renderGraph } from './pipeline/render'
@@ -139,7 +139,22 @@ export function compose(input: ComposeInput): ComposeResult {
 
   // One light source, kept in the upper half so every shadow falls downward.
   const angle = lightRng.range(-Math.PI * 0.82, -Math.PI * 0.18)
-  const light = { angle, dx: Math.cos(angle), dy: Math.sin(angle) }
+  const screenLight = { angle, dx: Math.cos(angle), dy: Math.sin(angle) }
+
+  /**
+   * The same light, turned into the field's own frame.
+   *
+   * One vector was being read in two coordinate systems. The ground, the
+   * shade, the sheen and the atmosphere are laid down in screen space; every
+   * renderer's shading, and the cast shadow filter, live inside the layout
+   * transform, which turns the field by up to 44 degrees and mirrors it half
+   * the time. So half the catalogue was lit from two directions at once — the
+   * specular sweep on the left of the screen and the shadow the subject threw
+   * falling to the right of it — and the eye reads that as "shaded by a
+   * filter" rather than as lit. Undoing the transform once, here, is what
+   * makes one light source read as one light source.
+   */
+  const light = toFieldLight(screenLight, plan)
 
   const noise = makeNoise(noiseRng)
 
@@ -147,17 +162,19 @@ export function compose(input: ComposeInput): ComposeResult {
   const falloffR = short * (0.45 + 0.95 * falloffK)
   // Falloff answers to the nearest focal, so a twin layout gets two centres of
   // interest rather than one plus a shape sitting in a dead part of the field.
+  //
+  // The floor is what stops the far field ending at a circle. Clamped to zero,
+  // everything past `falloffR` was not thin, it was absent, so a quiet
+  // composition had a hard circular boundary with uniform nothing outside it —
+  // a circle of emptiness rather than deliberate negative space. Three percent
+  // is a whisper: sub-pixel marks and opacities a viewer reads as air.
   const decay = (x: number, y: number) => {
     let best = 0
     for (const foc of focals) {
       const d = clamp(1 - (Math.hypot(x - foc.cx, y - foc.cy) / falloffR) ** 1.6, 0, 1)
       if (d > best) best = d
     }
-    return best
-  }
-  const inside = (x: number, y: number) => {
-    for (const foc of focals) if (foc.contains(x, y)) return true
-    return false
+    return Math.max(best, 0.03)
   }
 
   const now = () => (typeof performance !== 'undefined' ? performance.now() : Date.now())
@@ -190,6 +207,7 @@ export function compose(input: ComposeInput): ComposeResult {
     anchor: { x: focal.cx / w, y: focal.cy / h },
     baseline: Math.max(h * 0.45, Math.min(h * 0.86, focal.cy + focal.ry * 0.5)),
     light,
+    screenLight,
     falloff: decay,
     /**
      * Subject and ground, with a floor.
@@ -212,12 +230,28 @@ export function compose(input: ComposeInput): ComposeResult {
        * ground goes genuinely bare and the marks gather, which is what the
        * quiet direction is for.
        */
-      if (inside(x, y)) return 1
       const k = character.falloff
       const d = decay(x, y)
       const s = d * d * (3 - 2 * d)
       const shaped = k <= 1 ? 1 - k * (1 - s) : Math.pow(s, k)
-      return (1 - 0.1 * Math.min(k, 1)) * shaped
+      const ground = (1 - 0.1 * Math.min(k, 1)) * shaped
+      /**
+       * The subject is a band, not a step.
+       *
+       * This used to return a hard 1 anywhere `contains` was true, and the step
+       * across the silhouette is large — for the atmospheric default it jumps
+       * from about two thirds to one. Every renderer that gates its sample
+       * count on density printed that jump as a circular seam sitting exactly
+       * on the form edge: the ring in the dot field, the ring in the starfield.
+       * Fading it over the outer tenth of the form keeps the subject dense and
+       * costs the seam.
+       */
+      let core = 0
+      for (const foc of focals) {
+        const q = smoothstep(1.12, 0.94, foc.norm(x, y))
+        if (q > core) core = q
+      }
+      return ground + (1 - ground) * core
     },
     noise2: noise.noise2,
     fbm: noise.fbm,
@@ -352,7 +386,21 @@ function assemble(
   // where it lives in field space once the field is rotated and scaled.
   const sx = plan.screen.cx
   const sy = plan.screen.cy
-  const vignetteR = Math.hypot(Math.max(sx, w - sx), Math.max(sy, h - sy))
+  /**
+   * The vignette is shaped to the frame, not to a circle.
+   *
+   * A circle whose radius reaches the far corner puts the long edges of a
+   * portrait frame at four tenths of the way out — below the first meaningful
+   * stop — so the "vignette" was two or four dark smudges in the corners with
+   * completely open long sides. Measuring the vertical distance in units of the
+   * horizontal one squashes the falloff onto the aspect, and the gradient
+   * transform stretches it back, so all four edges sit at the same place on the
+   * ramp. It multiplies rather than laying flat navy over the picture, which
+   * greyed the shadows instead of deepening them; multiply is stronger at equal
+   * alpha, so the peak comes down to compensate.
+   */
+  const vigAspect = h / w
+  const vignetteR = Math.hypot(Math.max(sx, w - sx), Math.max(sy, h - sy) / vigAspect)
   const vignetteColor = mixHex(p.ink, '#0A0C12', 0.55)
   const vig = (a: number) => (a * character.vignette).toFixed(3)
 
@@ -363,11 +411,15 @@ function assemble(
     el('clipPath', { id: `${uid}-out`, clipPathUnits: 'userSpaceOnUse' },
       el('path', { d: `M0 0H${f(w)}V${f(h)}H0Z${formPath}`, 'clip-rule': 'evenodd' })),
     el('radialGradient',
-      { id: `${uid}-vig`, gradientUnits: 'userSpaceOnUse', cx: sx, cy: sy, r: vignetteR },
+      {
+        id: `${uid}-vig`, gradientUnits: 'userSpaceOnUse', cx: sx, cy: sy, r: vignetteR,
+        gradientTransform:
+          `translate(${f(sx)} ${f(sy)}) scale(1 ${f(vigAspect)}) translate(${f(-sx)} ${f(-sy)})`,
+      },
       el('stop', { offset: '0', 'stop-color': vignetteColor, 'stop-opacity': 0 }) +
-      el('stop', { offset: '0.5', 'stop-color': vignetteColor, 'stop-opacity': vig(0.05) }) +
-      el('stop', { offset: '0.82', 'stop-color': vignetteColor, 'stop-opacity': vig(0.22) }) +
-      el('stop', { offset: '1', 'stop-color': vignetteColor, 'stop-opacity': vig(0.42) })),
+      el('stop', { offset: '0.5', 'stop-color': vignetteColor, 'stop-opacity': vig(0.04) }) +
+      el('stop', { offset: '0.82', 'stop-color': vignetteColor, 'stop-opacity': vig(0.18) }) +
+      el('stop', { offset: '1', 'stop-color': vignetteColor, 'stop-opacity': vig(0.34) })),
     // Grain as a stitched tile behind a pattern: filter cost is constant in
     // canvas size, so a 4x export costs the same as a thumbnail.
     el('filter',
@@ -409,20 +461,50 @@ function assemble(
    * It used to carry a misregistered outline, a hairline stroke offset toward
    * the light. That was the single clearest tell that these were diagrams: a
    * shape with a line around it is a symbol of a thing, where a shape with a
-   * shadow under it is a thing. The form is now fill and shadow only, and its
-   * edge is whatever the field draws across it.
+   * shadow under it is a thing.
+   *
+   * What replaced it was barely better: one opaque path filled with a mix of
+   * the ground and the bottom of the ramp. At the fills the directions actually
+   * ask for that mix IS the ground — so the pass painted ground colour over the
+   * lit ground, the shade, the atmosphere and everything in `scene.behind`,
+   * punching a flat, dead, hard-edged hole through all of it and erasing the
+   * halos and the inner detail that were drawn to pass behind the form. With no
+   * shading on it at all it disagreed with the light by construction, which is
+   * the same clip-art tell arriving by a different route.
+   *
+   * So: a mix of nothing is not a shape, it is an eraser, and that case is
+   * skipped outright. What is left TINTS what is under it rather than replacing
+   * it, and carries a light model — a gradient along the light, a rim on the
+   * lit side, an occlusion into the shadowed limb.
    */
-  if (renderer.mode !== 'canvas') {
+  if (renderer.mode !== 'canvas' && character.formFill >= 0.03) {
+    defs.push(...formGradients(ctx, uid, character))
     for (const foc of focals) {
-      const fill = el('path', {
-        d: foc.path,
-        fill: mixHex(p.ground, p.ramp[0], character.formFill),
-      })
       // The subject sits above the field, so it casts onto it — except where
       // the direction is printed rather than photographed, and a soft shadow
-      // under a flat shape is the single clearest way to break that.
-      field.push(character.cast ? el('g', { filter: `url(#${uid}-cast)` }, fill) : fill)
+      // under a flat shape is the single clearest way to break that. The
+      // shadow is clipped to outside the form because the form no longer hides
+      // its own shadow: it is a tint now, and would show it straight through.
+      if (character.cast) {
+        field.push(el('g', { 'clip-path': `url(#${uid}-out)` },
+          el('path', { d: foc.path, fill: p.ink, filter: `url(#${uid}-cast)` })))
+      }
+      field.push(el('path', {
+        d: foc.path,
+        fill: p.ramp[0],
+        'fill-opacity': character.formFill.toFixed(3),
+      }))
+      field.push(el('path', { d: foc.path, fill: `url(#${uid}-form)` }))
+      field.push(el('path', { d: foc.path, fill: `url(#${uid}-form-occ)` }))
     }
+    // The rim is clipped to the form so it reads as an inner edge catching the
+    // light rather than as an outline drawn around a symbol.
+    field.push(group({ 'clip-path': `url(#${uid}-in)`, fill: 'none' },
+      focals.map((foc) => el('path', {
+        d: foc.path,
+        stroke: `url(#${uid}-form-rim)`,
+        'stroke-width': ctx.u(3.2),
+      }))))
   }
 
   // stage 5: the field at full density, clipped to the form
@@ -434,11 +516,24 @@ function assemble(
     field.push(group({ fill: 'none' }, ghostGeometry(ctx)))
   }
 
-  // stage 7: elements crossing over the form edge
-  field.push(group({ filter: `url(#${uid}-lift)` }, scene.front))
+  /**
+   * stage 7: elements crossing over the form edge.
+   *
+   * Gated the same way the subject's own shadow is. This was unconditional, so
+   * every front element in every composition got a drop shadow — including the
+   * printed and macro directions, which declare `cast: false` precisely because
+   * they are flat. That is the grey band trailing each hero vein in the marble
+   * and the halo around the terrazzo chips: a smudge where the direction asked
+   * for none.
+   */
+  field.push(
+    character.cast
+      ? group({ filter: `url(#${uid}-lift)` }, scene.front)
+      : group({}, scene.front),
+  )
 
   // stage 8: the single accent
-  if (scene.accent) field.push(bloomed(scene.accent, uid, character))
+  if (scene.accent) field.push(bloomed(scene.accent, uid, character, p))
 
   const transform = fieldTransform(plan, w, h)
   const layers: string[] = []
@@ -451,6 +546,13 @@ function assemble(
   }
   layers.push(transform ? el('g', { transform }, field.join('')) : field.join(''))
 
+  // The multiply half of the light model has to reach the same pixels the
+  // screen half does. Below the field `shade` only ever darkened bare ground,
+  // so the artwork was lifted by the sheen and deepened by nothing and every
+  // frame settled into the middle of its value range with nothing genuinely
+  // dark in it. This second, weaker pass puts the unlit quadrant across the
+  // picture as well as under it.
+  layers.push(shade(ctx, uid, character, 0.55))
   layers.push(sheen(ctx, uid, character))
 
   // vignette and grain: screen space, never rotated
@@ -468,20 +570,36 @@ function assemble(
 }
 
 /**
- * Hairline arcs and circles extending well past the solid form. The cheapest
- * way to make a composition look intentional rather than generated.
+ * Hairline arcs extending well past the solid form. The cheapest way to make a
+ * composition look intentional rather than generated — and the easiest to get
+ * wrong, because it was the literal "uniform hairlines with no structure"
+ * complaint in the shared layer.
+ *
+ * It drew nought to two arcs, so a third of the frames that ran it got nothing
+ * and a third got one lone line. With one the radius lerp divided by zero-plus-
+ * one and collapsed to the base radius, so that lone line landed right on the
+ * focal silhouette: a misregistered outline arc, exactly what stage 4 dropped
+ * its outline to avoid. Every arc was one sub-pixel width at one flat opacity
+ * with round caps, so both ends stopped dead in mid-air.
+ *
+ * A family of marks instead: enough of them to read as a system, widths spread
+ * hard with one clearly dominant, and each one tapered to nothing at both ends
+ * so it passes through the frame rather than starting and stopping in it.
  */
 function ghostGeometry(ctx: RenderContext): string[] {
   const rng = ctx.fork('ghost')
   const { focal } = ctx
   const base = Math.max(focal.rx, focal.ry)
   const out: string[] = []
-  const count = rng.int(0, 2)
+  const count = rng.int(3, 5)
+  const lead = rng.int(0, count - 1)
   for (let i = 0; i < count; i++) {
-    const r = base * lerp(1.06, 2.35, i / Math.max(1, count - 1)) * rng.range(0.94, 1.08)
-    const opacity = rng.range(0.14, 0.24) * (1 - 0.35 * (i / count))
-    const stroke = withAlpha(ctx.ramp(rng.range(0.45, 0.75)), opacity)
-    const width = ctx.u(rng.range(0.7, 1.3))
+    const t = count === 1 ? 0.45 : i / (count - 1)
+    const r = base * lerp(1.06, 2.35, t) * rng.range(0.94, 1.08)
+    const dominant = i === lead
+    const opacity = (dominant ? 0.3 : lerp(0.2, 0.06, t)) * rng.range(0.85, 1.15)
+    const tone = ctx.ramp(rng.range(0.45, 0.75))
+    const width = dominant ? ctx.u(rng.range(1.7, 2.4)) : ctx.u(rng.range(0.4, 0.9))
     /**
      * Arcs only. A closed ring reads as a drawn object — a second subject
      * competing with the focal form it is supposed to be sitting behind —
@@ -491,17 +609,56 @@ function ghostGeometry(ctx: RenderContext): string[] {
      */
     const a0 = rng.range(0, Math.PI * 2)
     const a1 = a0 + rng.range(Math.PI * 0.45, Math.PI * 1.5)
+    const x0 = focal.cx + Math.cos(a0) * r
+    const y0 = focal.cy + Math.sin(a0) * r
+    const x1 = focal.cx + Math.cos(a1) * r
+    const y1 = focal.cy + Math.sin(a1) * r
+    const id = `${ctx.uid}-gh${i}`
+    // The taper is in the stroke paint, along the chord: a flat opacity with a
+    // cap on it is a line that begins and ends inside the picture, which is
+    // what made these read as leftover construction lines.
+    out.push(el('linearGradient',
+      { id, gradientUnits: 'userSpaceOnUse', x1: x0, y1: y0, x2: x1, y2: y1 },
+      el('stop', { offset: '0', 'stop-color': tone, 'stop-opacity': 0 }) +
+      el('stop', { offset: '0.5', 'stop-color': tone, 'stop-opacity': opacity.toFixed(3) }) +
+      el('stop', { offset: '1', 'stop-color': tone, 'stop-opacity': 0 })))
     out.push(el('path', {
       d:
-        `M${f(focal.cx + Math.cos(a0) * r)} ${f(focal.cy + Math.sin(a0) * r)}` +
-        `A${f(r)} ${f(r)} 0 ${a1 - a0 > Math.PI ? 1 : 0} 1 ` +
-        `${f(focal.cx + Math.cos(a1) * r)} ${f(focal.cy + Math.sin(a1) * r)}`,
-      stroke,
+        `M${f(x0)} ${f(y0)}` +
+        `A${f(r)} ${f(r)} 0 ${a1 - a0 > Math.PI ? 1 : 0} 1 ${f(x1)} ${f(y1)}`,
+      stroke: `url(#${id})`,
       'stroke-width': width,
-      'stroke-linecap': 'round',
+      'stroke-linecap': 'butt',
     }))
   }
   return out
+}
+
+/**
+ * The screen-space light, expressed in the field's frame.
+ *
+ * The layout transform is `rotate` then a possibly mirrored `scale` about the
+ * canvas centre, so a field vector reaches the screen as R(rotate)·S(flip)·v.
+ * Inverting that is what a renderer needs to shade a form so that its lit side
+ * comes out facing the light once the field has been turned. Uniform scale
+ * drops out; only the rotation and the mirror matter.
+ */
+function toFieldLight(
+  l: { angle: number; dx: number; dy: number },
+  plan: LayoutPlan,
+): { angle: number; dx: number; dy: number } {
+  const rad = (plan.rotate * Math.PI) / 180
+  const cos = Math.cos(rad)
+  const sin = Math.sin(rad)
+  const dx = (l.dx * cos + l.dy * sin) * (plan.flip ? -1 : 1)
+  const dy = -l.dx * sin + l.dy * cos
+  return { angle: Math.atan2(dy, dx), dx, dy }
+}
+
+/** Hermite fade between two edges; `e0` may sit above `e1` to run downward. */
+function smoothstep(e0: number, e1: number, x: number): number {
+  const t = clamp((x - e0) / (e1 - e0), 0, 1)
+  return t * t * (3 - 2 * t)
 }
 
 function hashString(s: string): number {

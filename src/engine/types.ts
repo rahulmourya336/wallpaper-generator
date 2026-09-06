@@ -21,6 +21,13 @@ export type Focal = {
   path: string
   /** cheap analytic test — never path hit-testing, this runs thousands of times */
   contains(x: number, y: number): boolean
+  /**
+   * The same test as a continuous value: below 1 inside, exactly 1 on the
+   * silhouette, growing outward. `contains` is a cliff, and anything that gates
+   * on it prints that cliff — a circular seam in the dot field exactly on the
+   * form edge. A number lets the transition be a band instead of a step.
+   */
+  norm(x: number, y: number): number
 }
 
 export type ParamSpec =
@@ -83,8 +90,19 @@ export type RenderContext = {
    * matter where the layout put the subject. Sit on this instead.
    */
   baseline: number
-  /** one light source per composition; every shadow agrees with it */
+  /**
+   * One light source per composition, expressed in the FIELD's own frame.
+   *
+   * Everything a renderer draws goes through the layout transform, which turns
+   * the field by up to 44 degrees and mirrors it half the time. A vector that
+   * is correct on screen is not correct under that transform, which is how a
+   * composition ended up with a ground lit from the left and a subject shaded
+   * from the right. Renderers get this one; the screen-space passes get the
+   * other.
+   */
   light: { angle: number; dx: number; dy: number }
+  /** the same light before the layout transform, for passes drawn in screen space */
+  screenLight: { angle: number; dx: number; dy: number }
 
   /** 1 at the focal centre, decaying toward the far corner */
   falloff(x: number, y: number): number

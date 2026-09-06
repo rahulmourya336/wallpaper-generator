@@ -7,3 +7,4 @@ dist
 # headless contact sheet
 shots*
 .sheet.cjs
+.revamp.js

@@ -5,6 +5,11 @@ import { circlePath, ellipsePath, f } from './svg'
  * The dominant form. Placement is layout-owned (see `layout.ts`) so no family
  * can break the rule that the top third of a portrait composition stays quiet,
  * which is where the clock and notifications sit.
+ *
+ * Every kind carries `norm` alongside `contains`, and the two must agree:
+ * `contains` is exactly `norm <= 1`. The continuous form is what lets the
+ * compositor fade the field across the silhouette instead of stepping it, so
+ * the edge of the form stops printing itself as a seam in the dot field.
  */
 export function makeFocal(kind: FocalKind, cx: number, cy: number, rx: number, ry: number): Focal {
   switch (kind) {
@@ -15,6 +20,7 @@ export function makeFocal(kind: FocalKind, cx: number, cy: number, rx: number, r
         kind, cx, cy, rx: r, ry: r,
         path: circlePath(cx, cy, r),
         contains: (x, y) => (x - cx) ** 2 + (y - cy) ** 2 <= r * r,
+        norm: (x, y) => Math.hypot(x - cx, y - cy) / r,
       }
     }
     case 'ellipse':
@@ -22,12 +28,14 @@ export function makeFocal(kind: FocalKind, cx: number, cy: number, rx: number, r
         kind, cx, cy, rx, ry,
         path: ellipsePath(cx, cy, rx, ry),
         contains: (x, y) => ((x - cx) / rx) ** 2 + ((y - cy) / ry) ** 2 <= 1,
+        norm: (x, y) => Math.hypot((x - cx) / rx, (y - cy) / ry),
       }
     case 'diamond':
       return {
         kind, cx, cy, rx, ry,
         path: `M${f(cx)} ${f(cy - ry)}L${f(cx + rx)} ${f(cy)}L${f(cx)} ${f(cy + ry)}L${f(cx - rx)} ${f(cy)}Z`,
         contains: (x, y) => Math.abs(x - cx) / rx + Math.abs(y - cy) / ry <= 1,
+        norm: (x, y) => Math.abs(x - cx) / rx + Math.abs(y - cy) / ry,
       }
     case 'lens': {
       // a vesica: two arcs meeting at points, top and bottom
@@ -40,6 +48,7 @@ export function makeFocal(kind: FocalKind, cx: number, cy: number, rx: number, r
           `A${f(bulge)} ${f(ry * 1.6)} 0 0 1 ${f(cx)} ${f(cy - ry)}Z`,
         // the analytic test only has to be close; it gates thousands of samples
         contains: (x, y) => ((x - cx) / (rx * 0.86)) ** 2 + ((y - cy) / ry) ** 2 <= 1,
+        norm: (x, y) => Math.hypot((x - cx) / (rx * 0.86), (y - cy) / ry),
       }
     }
     case 'portal': {
@@ -54,6 +63,7 @@ export function makeFocal(kind: FocalKind, cx: number, cy: number, rx: number, r
           `H${f(cx - rx + r)}A${f(r)} ${f(r)} 0 0 1 ${f(cx - rx)} ${f(cy + ry - r)}` +
           `V${f(cy - ry + r)}A${f(r)} ${f(r)} 0 0 1 ${f(cx - rx + r)} ${f(cy - ry)}Z`,
         contains: (x, y) => Math.abs(x - cx) <= rx && Math.abs(y - cy) <= ry,
+        norm: (x, y) => Math.max(Math.abs(x - cx) / rx, Math.abs(y - cy) / ry),
       }
     }
     case 'arch': {
@@ -72,6 +82,11 @@ export function makeFocal(kind: FocalKind, cx: number, cy: number, rx: number, r
           if (y >= spring) return true
           return (x - cx) ** 2 + (y - spring) ** 2 <= w * w
         },
+        // the jambs are a box, the head is a circle on the springing line
+        norm: (x, y) =>
+          y >= spring
+            ? Math.max(Math.abs(x - cx) / w, (y - cy) / ry)
+            : Math.hypot(x - cx, y - spring) / w,
       }
     }
   }

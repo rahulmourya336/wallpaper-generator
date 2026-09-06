@@ -341,8 +341,11 @@ export function renderGpu(input: GpuInput): ((c: CanvasRenderingContext2D) => vo
     tex(2, GB.textures[2] as WebGLTexture, lu['uField'] ?? null)
     if (noise) tex(3, noise, lu['uNoise'] ?? null)
     gl.uniform2f(lu['uRes'] ?? null, w, h)
-    // the light direction on screen, which is where the marcher walks
-    gl.uniform2f(lu['uLight'] ?? null, ctx.light.dx, -ctx.light.dy)
+    // The light direction on screen, which is where the marcher walks. The
+    // g-buffer was rasterised through the layout transform, so this pass reads
+    // screen pixels and wants the screen-space light — not `ctx.light`, which
+    // is the same source expressed in the field's own rotated, mirrored frame.
+    gl.uniform2f(lu['uLight'] ?? null, ctx.screenLight.dx, -ctx.screenLight.dy)
     gl.uniform3f(lu['uGround'] ?? null, ground[0], ground[1], ground[2])
     gl.uniform3f(lu['uInk'] ?? null, ink[0], ink[1], ink[2])
     gl.uniform3f(lu['uAccent'] ?? null, accent[0], accent[1], accent[2])
